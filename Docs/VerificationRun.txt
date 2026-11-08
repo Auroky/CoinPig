@@ -1,0 +1,42 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+OpenGL API 3.3.0 NVIDIA 581.80 - Compatibility - Using Device: NVIDIA - NVIDIA GeForce RTX 3070 Ti Laptop GPU
+
+CHECK: capture 01-intro
+CHECK: start button begins playable day
+CHECK: capture 02-table
+CHECK: starts in fullscreen
+CHECK: F11 returns to windowed mode
+CHECK: capture 09-window
+CHECK: F11 restores fullscreen
+CHECK: starts with two ordinary pigs
+CHECK: starting or resuming waits for pointer movement
+CHECK: outside pointer does not spend stamina
+CHECK: pause freezes automatic swings and actors
+CHECK: help returns to pause without checking text
+CHECK: mouse movement alone lands a hit without a button press
+CHECK: stationary pointer continues at the recovery cadence
+CHECK: leaving the table stops new automatic swings
+CHECK: early end reaches settlement
+CHECK: capture 03-settlement
+CHECK: unaffordable shop action is visible and non-destructive
+CHECK: capture 04-shop
+CHECK: locked skill cannot be purchased through UI
+CHECK: capture 05-skills
+CHECK: capture 10-skills-wide
+CHECK: unpaid day two reaches failure screen
+CHECK: capture 06-bankrupt
+DAY 1: income 48, wallet 48
+CHECK: capture 11-reward
+DAY 2: income 65, wallet 67
+DAY 3: income 75, wallet 134
+DAY 4: income 119, wallet 121
+DAY 5: income 171, wallet 256
+DAY 6: income 171, wallet 325
+DAY 7: income 189, wallet 482
+DAY 8: income 189, wallet 510
+DAY 9: income 208, wallet 702
+CHECK: normal aiming bot completes ten-day contract
+CHECK: capture 07-victory
+CHECK: victory continues into endless mode
+CHECK: capture 08-rent
+VERIFICATION PASS: 29 checks; 20691 simulated frames; wallet 755.
