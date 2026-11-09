@@ -5,24 +5,24 @@ using System.Numerics;
 
 internal static class ProjectionChecks
 {
-    public static string Run(IWorkbench surface)
+    public static string Run(IWorkbenchProjection surface)
     {
         var trace = new List<string>();
         foreach (bool paired in new[] { true, false })
         {
-            var direct = new GameSession(new Random(4702));
-            var projected = new GameSession(new Random(4702));
+            var direct = DefaultGame.CreateSession(new Random(4702));
+            var projected = DefaultGame.CreateSession(new Random(4702));
             for (int day = 1; day <= 10; day++)
             {
                 direct.BeginShift(); projected.BeginShift();
-                var firstHerd = new PigHerd(HerdLayout.Initial);
-                var secondHerd = new PigHerd(HerdLayout.Initial);
+                var firstHerd = new PigHerd(PigContent.Roster.Spawns);
+                var secondHerd = new PigHerd(PigContent.Roster.Spawns);
                 int frames = 0;
                 while (direct.Stamina > 0 && frames++ < 20000)
                 {
                     firstHerd.Advance(.05f); secondHerd.Advance(.05f);
                     Vector2 target = paired ? (firstHerd.Pigs[0].Position + firstHerd.Pigs[1].Position) / 2 : new(7.3f, 3.7f);
-                    float radius = 1.43f + direct.ExtraRadius;
+                    float radius = direct.Radius;
                     if (paired && firstHerd.Pigs.Take(2).Any(p => !p.Active || Vector2.Distance(p.Position, target) > radius - .4f)) continue;
                     if (!surface.TryWorldPosition(surface.ScreenPosition(target), out var recovered))
                         throw new Exception("A reachable world target could not be picked through the view.");
@@ -41,9 +41,9 @@ internal static class ProjectionChecks
                 trace.Add($"settled;{paired};{day};{projected.Phase};{projected.Wallet};{projected.Receipt!.Paid}");
                 if (direct.Phase == ShiftPhase.Choosing)
                 {
-                    if (!direct.Offers.Select(p => p.Kind).SequenceEqual(projected.Offers.Select(p => p.Kind)))
+                    if (!direct.Offers.Select(p => p.Id).SequenceEqual(projected.Offers.Select(p => p.Id)))
                         throw new Exception("Seeded reward offers differ.");
-                    var choice = direct.Offers[0].Kind;
+                    var choice = direct.Offers[0].Id;
                     direct.Choose(choice); projected.Choose(choice);
                 }
                 if (direct.Phase is ShiftPhase.Won or ShiftPhase.Bankrupt) break;

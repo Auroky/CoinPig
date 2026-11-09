@@ -4,8 +4,9 @@ using System.Collections.Generic;
 using WorldPoint = System.Numerics.Vector2;
 
 /// <summary>3D adapter for the same planar tabletop rules used by the canvas view.</summary>
-public partial class TabletopView : Node3D, IWorkbench, IRewardFeedback
+public partial class TabletopView : Node3D, IWorkbench, IRewardFeedback, IPigAppearanceConsumer
 {
+    public IPigAppearanceSource Appearances { private get; set; } = new PigRoster(Array.Empty<PigArchetype>());
     private readonly TabletopMaterials _materials = new();
     private readonly Dictionary<PigState, PigModel> _models = new();
     private HammerModel _hammer = null!;
@@ -44,7 +45,7 @@ public partial class TabletopView : Node3D, IWorkbench, IRewardFeedback
         int index = 0;
         foreach (var pig in pigs)
         {
-            var model = new PigModel(); AddChild(model); model.Assemble(pig, index++, _materials);
+            var model = new PigModel(); AddChild(model); model.Assemble(pig, index++, _materials, Appearances.GetAppearance(pig.State.Definition.Id));
             _models.Add(pig.State, model);
         }
         Windup = Cooldown = 0;

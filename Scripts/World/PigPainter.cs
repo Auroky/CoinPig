@@ -1,21 +1,13 @@
 using Godot;
-using System.Collections.Generic;
 
 public sealed record PigLook(Color Body, Color Nose, bool Metal);
 
 public static class PigPainter
 {
-    private static readonly IReadOnlyDictionary<string, PigLook> Looks = new Dictionary<string, PigLook>
+    public static void Draw(Node2D canvas, PigMotion pig, Vector2 position, float scale, float flash, PigAppearance appearance)
     {
-        ["ceramic"] = new(new("c18d7a"), new("d3a18b"), false),
-        ["tin"] = new(new("7b8a83"), new("9eaca2"), true),
-        ["swift"] = new(new("c4ad79"), new("deba62"), false)
-    };
-    public static PigLook Look(string species) => Looks.TryGetValue(species, out var look) ? look : Looks["ceramic"];
-
-    public static void Draw(Node2D canvas, PigMotion pig, Vector2 position, float scale, float flash)
-    {
-        var look = Look(pig.State.Definition.Id);
+        var look = new PigLook(new(appearance.Body2D), new(appearance.Nose2D), appearance.Metal);
+        scale *= appearance.Scale2D;
         var body = flash > 0 ? look.Body.Lerp(Colors.White, .65f) : look.Body;
         position += new Vector2(0, Mathf.Sin(pig.Time * 9) * 1.8f * scale);
         canvas.DrawSetTransform(position + new Vector2(5, 16) * scale, 0, new Vector2(1.35f, .65f) * scale);
@@ -40,6 +32,9 @@ public static class PigPainter
         if (look.Metal)
         {
             canvas.DrawArc(new(-2, -1), 19, 1.7f, 4.6f, 20, new("b5c0ac"), 2, true);
+        }
+        if (pig.State.Definition.MaxHealth > 1)
+        {
             for (int i = 0; i < pig.State.Definition.MaxHealth; i++)
                 canvas.DrawCircle(new(-9 + i * 9, 33), 3, i < pig.State.Health ? new("d9bd7d") : new Color(0, 0, 0, .3f));
         }

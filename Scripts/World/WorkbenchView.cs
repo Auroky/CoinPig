@@ -4,8 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 
 /// <summary>Maps world-space pigs to the workbench and draws the aiming tool.</summary>
-public partial class WorkbenchView : Node2D, IWorkbench
+public partial class WorkbenchView : Node2D, IWorkbench, IPigAppearanceConsumer
 {
+    public IPigAppearanceSource Appearances { private get; set; } = new PigRoster(Array.Empty<PigArchetype>());
     private IReadOnlyList<PigMotion> _pigs = Array.Empty<PigMotion>();
     public Vector2 Aim { get; set; }
     public bool ShowPigs { get; set; } = true;
@@ -67,7 +68,7 @@ public partial class WorkbenchView : Node2D, IWorkbench
             var pig = _pigs.FirstOrDefault(p => ReferenceEquals(p.State, hit.Pig));
             if (pig == null) continue;
             _flashes[hit.Pig] = .22f;
-            if (hit.Result.Destroyed) _effects.Break(ScreenPosition(pig), PigPainter.Look(hit.Pig.Definition.Id).Body);
+            if (hit.Result.Destroyed) _effects.Break(ScreenPosition(pig), new Color(Appearances.GetAppearance(hit.Pig.Definition.Id).Body2D));
         }
         _effects.Strike(ScreenPosition(point), Radius * UnitScale);
     }
@@ -78,7 +79,7 @@ public partial class WorkbenchView : Node2D, IWorkbench
     {
         if (ShowPigs)
             foreach (var pig in _pigs.OrderBy(pig => pig.Position.Y))
-                if (pig.Active) PigPainter.Draw(this, pig, ScreenPosition(pig), UnitScale / 55, _flashes.GetValueOrDefault(pig.State));
+                if (pig.Active) PigPainter.Draw(this, pig, ScreenPosition(pig), UnitScale / 55, _flashes.GetValueOrDefault(pig.State), Appearances.GetAppearance(pig.State.Definition.Id));
         if (!ShowAim || !PlayArea.HasPoint(Aim)) return;
         float radius = Radius * UnitScale;
         Color ring = Windup > 0 ? new("e0b76d") : Cooldown > 0 ? new Color(.7f, .65f, .5f, .35f) : new Color(.95f, .85f, .63f, .75f);

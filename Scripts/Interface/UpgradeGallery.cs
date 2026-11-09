@@ -7,14 +7,6 @@ using System.Linq;
 public partial class UpgradeGallery : Control
 {
     private sealed record Choice(Node3D Model, Vector2 Extent, Button Button);
-    private static readonly IReadOnlyDictionary<SkillBranch, (string Name, string Color, int Order)> Branches =
-        new Dictionary<SkillBranch, (string, string, int)>
-        {
-            [SkillBranch.Hammer] = ("锤击", "477681", 0),
-            [SkillBranch.Heavy] = ("重击", "9b754a", 1),
-            [SkillBranch.Stamina] = ("耐力", "647956", 2),
-            [SkillBranch.Income] = ("收益", "9b6550", 3)
-        };
     private readonly TabletopMaterials _materials = new();
     private readonly List<Choice> _choices = new();
     private SubViewport _viewport = null!;
@@ -115,7 +107,7 @@ public partial class UpgradeGallery : Control
                 var item = new Node3D { Position = new(-5.92f + (column + .5f) * columnWidth, 6.61f - (tier + .5f) * rowHeight, .1f) };
                 _world.AddChild(item);
                 var display = new Node3D { Scale = Vector3.One * modelScale }; item.AddChild(display);
-                if (EquipmentVisuals.For(offer.Product.Id) == EquipmentAppearance.Cuff) _art.Cuff(display, tier); else _art.Hammer(display, tier);
+                if (offer.Product.Appearance == "cuff") _art.Cuff(display, tier); else _art.Hammer(display, tier);
                 SceneShapes.Box(display, new(0, -.68f, 1.08f), new(3, .70f, .06f), _materials.Paint("282c29"));
                 string status = tier < offer.Level ? "已购入" : tier > offer.Level ? "未解锁" :
                     offer.Status == PurchaseStatus.InsufficientFunds ? $"¥{offer.Price} · 余额不足" : $"¥{offer.Price} · 点击购买";
@@ -141,7 +133,7 @@ public partial class UpgradeGallery : Control
         _art.Wood(board, new(0, 3.7f, -.18f), new(12, 7.1f, .30f), new("302622"));
         foreach (float x in new[] { -6.1f, 6.1f }) _art.Wood(board, new(x, 3.7f, 0), new(.20f, 7.4f, .42f), new("815737"));
         foreach (float y in new[] { .07f, 7.33f }) _art.Wood(board, new(0, y, 0), new(12.4f, .20f, .42f), new("815737"));
-        var branches = offers.Select(offer => offer.Skill.Branch).Distinct().OrderBy(branch => Branches.TryGetValue(branch, out var data) ? data.Order : 99).ToArray();
+        var branches = offers.Select(offer => offer.Skill.Branch).Distinct().OrderBy(branch => branch.Order).ToArray();
         var positions = new Dictionary<string, Vector3>();
         foreach (var offer in offers)
         {
@@ -151,7 +143,7 @@ public partial class UpgradeGallery : Control
             positions[skill.Id] = new(x + (skill.Tier == 1 ? .16f : -.10f), 1.15f + skill.Tier * 1.82f, .15f);
         }
         for (int i = 0; i < branches.Length; i++)
-            _art.Label(board, Branches.TryGetValue(branches[i], out var data) ? data.Name : branches[i].ToString(), new(-6 + (i + .5f) * 12 / branches.Length, 6.76f, .15f), 43, .009f);
+            _art.Label(board, branches[i].Name, new(-6 + (i + .5f) * 12 / branches.Length, 6.76f, .15f), 43, .009f);
         foreach (var offer in offers)
         {
             var skill = offer.Skill;
@@ -163,12 +155,12 @@ public partial class UpgradeGallery : Control
                 SceneShapes.Beam(board, elbow, end, .027f, _materials.Paint("c59d56"));
             }
             var item = new Node3D { Position = positions[skill.Id] }; board.AddChild(item);
-            var branch = Branches.TryGetValue(skill.Branch, out var data) ? data : (skill.Branch.ToString(), "477681", 99);
+            var branch = skill.Branch;
             bool learned = offer.Status == SkillStatus.Learned, available = offer.Status == SkillStatus.Available;
-            var plate = SceneShapes.Box(item, new(0, .14f, 0), new(1.02f, .80f, .13f), _materials.Paint(learned ? "498369" : available ? branch.Item2 : "393937"));
+            var plate = SceneShapes.Box(item, new(0, .14f, 0), new(1.02f, .80f, .13f), _materials.Paint(learned ? "498369" : available ? branch.Color : "393937"));
             plate.RotationDegrees = new(0, 0, skill.Tier == 2 ? 45 : 0);
             var icon = new Node3D { Position = new(0, .17f, .12f) }; item.AddChild(icon);
-            _art.SkillIcon(icon, skill.Branch, new("dab982"));
+            _art.SkillIcon(icon, skill.Branch.Icon, new("dab982"));
             string status = learned ? "已学会" : offer.Status == SkillStatus.Locked ? "前置未解锁" : $"¥{skill.Cost}";
             var caption = _art.Label(item, $"{skill.Name}\n{status}", new(0, -.36f, .25f), 29, .009f);
             caption.Modulate = new(learned ? "a8d8b1" : available ? "ffdea1" : "9d9182");

@@ -1,7 +1,10 @@
 using Godot;
+using System;
+using System.Collections.Generic;
 
 public partial class WorkshopUi : CanvasLayer
 {
+    public IReadOnlyList<PigDefinition> PigDefinitions { get; set; } = Array.Empty<PigDefinition>();
     public bool SpatialCatalogs { get; set; }
     public WorkshopHud Hud { get; private set; } = null!;
     public WorkshopMenu Menu { get; private set; } = null!;
@@ -12,7 +15,7 @@ public partial class WorkshopUi : CanvasLayer
         AddChild(root);
         root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         Hud = new WorkshopHud();
-        Menu = new WorkshopMenu { SpatialCatalogs = SpatialCatalogs };
+        Menu = new WorkshopMenu { SpatialCatalogs = SpatialCatalogs, PigDefinitions = PigDefinitions };
         root.AddChild(Hud);
         root.AddChild(Menu);
         Hud.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);

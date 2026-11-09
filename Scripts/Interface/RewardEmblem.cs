@@ -3,7 +3,7 @@ using Godot;
 /// <summary>卡牌上的金色符号，随布局缩放，无需额外贴图。</summary>
 public partial class RewardEmblem : Control
 {
-    public Perk Kind { get; set; }
+    public string Emblem { get; set; } = "rim";
     private readonly Color _gold = new("cda06b");
     private readonly Color _shade = new("715535");
 
@@ -18,18 +18,18 @@ public partial class RewardEmblem : Control
         float scale = Mathf.Min(Size.X, Size.Y) / 140;
         DrawSetTransform(Size / 2 - new Vector2(64, 64) * scale, 0, Vector2.One * scale);
         DrawCircle(new(64, 64), 54, new Color(0.65f, 0.39f, 0.14f, 0.06f), true, -1, true);
-        switch (Kind)
+        switch (Emblem)
         {
-            case Perk.PairBonus:
+            case "pair":
                 Pig(new(43, 57), 0.72f);
                 Pig(new(84, 78), 0.72f);
                 break;
-            case Perk.SecondWind:
+            case "return":
                 Hammer();
                 DrawArc(new(64, 64), 49, -2.8f, 1.0f, 32, _gold, 4, true);
                 DrawColoredPolygon(new Vector2[] { new(85, 107), new(101, 94), new(104, 113) }, _gold);
                 break;
-            case Perk.CoinValue:
+            case "coins":
                 for (int i = 0; i < 3; i++)
                 {
                     Vector2 center = new(46 + i * 18, 79 - i * 16);
@@ -39,14 +39,14 @@ public partial class RewardEmblem : Control
                     DrawLine(center + new Vector2(0, -8), center + new Vector2(0, 8), _shade, 4, true);
                 }
                 break;
-            case Perk.Lunch:
+            case "cup":
                 CupBody();
                 DrawArc(new(84, 70), 15, -Mathf.Pi / 2, Mathf.Pi / 2, 18, _gold, 7, true);
                 DrawLine(new(27, 100), new(94, 100), _gold, 4, true);
                 for (int i = 0; i < 3; i++)
                     DrawPolyline(new Vector2[] { new(40 + i * 17, 43), new(36 + i * 17, 34), new(42 + i * 17, 24) }, _gold, 3, true);
                 break;
-            case Perk.Precision:
+            case "target":
                 Pig(new(64, 64), 0.72f);
                 DrawArc(new(64, 64), 42, 0, Mathf.Tau, 48, _gold, 2, true);
                 for (int i = 0; i < 4; i++)
@@ -55,7 +55,7 @@ public partial class RewardEmblem : Control
                     DrawLine(new Vector2(64, 64) + direction * 35, new Vector2(64, 64) + direction * 53, _gold, 4, true);
                 }
                 break;
-            case Perk.WideRim:
+            default:
                 DrawArc(new(64, 67), 46, 0, Mathf.Tau, 48, _shade, 2, true);
                 Hammer();
                 break;

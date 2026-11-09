@@ -1,30 +1,43 @@
 using Godot;
 using System;
+using System.Linq;
+using System.Collections.Generic;
 
 /// <summary>Connects the session, workbench, input and interface.</summary>
 public partial class Workshop : Node2D
 {
     [Export] public bool SpatialCatalogs { get; set; }
-    internal GameSession Session { get; private set; } = new();
-    internal PigHerd Herd { get; private set; } = new(HerdLayout.Initial);
+    public GameContent Content { get; init; } = DefaultGame.Content;
+    public IReadOnlyList<IStrikeFeedback> AdditionalFeedback { get; init; } = Array.Empty<IStrikeFeedback>();
+    private WorkshopRun _run = null!;
+    internal GameSession Session => _run.Session;
+    internal PigHerd Herd => _run.Herd;
     internal IWorkbench Bench { get; private set; } = null!;
     internal WorkshopUi Interface { get; private set; } = null!;
-    private readonly HammerSwing _hammer = new();
     private ImpactAudio _audio = null!;
     private IRewardFeedback? _rewardFeedback;
-    private float _settleDelay;
+    private IStrikeFeedback _strikeFeedback = null!;
     private Vector2 _pointerPosition = new(-1, -1);
-    private System.Numerics.Vector2 _strikePoint;
     private SessionSnapshot Snapshot => SessionSnapshot.From(Session);
 
     public override void _Ready()
     {
+        _run = new WorkshopRun(Content);
         Bench = GetNode("Workbench") as IWorkbench ??
             throw new InvalidOperationException("The scene needs a workbench presentation.");
-        _audio = new ImpactAudio();
-        Interface = new WorkshopUi { SpatialCatalogs = SpatialCatalogs };
+        if (Bench is IPigAppearanceConsumer appearanceConsumer) appearanceConsumer.Appearances = Content.Pigs;
+        _audio = new ImpactAudio { Appearances = Content.Pigs };
+        Interface = new WorkshopUi { SpatialCatalogs = SpatialCatalogs,
+            PigDefinitions = Content.Pigs.All.Select(pig => pig.Definition).ToArray() };
         AddChild(_audio);
         AddChild(Interface);
+        _strikeFeedback = new CompositeStrikeFeedback(new IStrikeFeedback[]
+        {
+            new ActionStrikeFeedback(outcome => Bench.Impact(outcome.Point, outcome.Strike)),
+            new ActionStrikeFeedback(outcome => _audio.PlayImpact(outcome.Strike)),
+            new ActionStrikeFeedback(outcome => Interface.Hud.ShowImpact(
+                () => Bench.ScreenPosition(outcome.Point), outcome.Strike, outcome.Coins))
+        }.Concat(AdditionalFeedback));
         Bench.Bind(Herd.Pigs);
         _rewardFeedback = Bench as IRewardFeedback;
         if (_rewardFeedback != null) _rewardFeedback.CoinCollected += Interface.Hud.PulseWallet;
@@ -77,7 +90,7 @@ public partial class Workshop : Node2D
         OpenSkills();
         Interface.Menu.Notify(GameText.Skill(result));
     }
-    private void Choose(Perk perk)
+    private void Choose(string perk)
     {
         if (!Session.Choose(perk)) return;
         Refresh();
@@ -85,13 +98,11 @@ public partial class Workshop : Node2D
     }
     private void Begin()
     {
-        if (!Session.BeginShift()) return;
+        if (!_run.BeginShift()) return;
         _audio.Clear();
-        _hammer.Reset();
-        _settleDelay = 0;
         _pointerPosition = new(-1, -1);
-        ResetHerd();
-        Bench.Radius = 1.43f + Session.ExtraRadius;
+        BindHerd();
+        Bench.Radius = Session.Radius;
         Interface.Menu.Close();
         Interface.Hud.Show();
         Refresh();
@@ -99,12 +110,10 @@ public partial class Workshop : Node2D
     }
     private void Restart()
     {
-        Session = new GameSession();
+        _run.Restart();
         _audio.Clear();
         Interface.Hud.ResetFeedback();
-        _hammer.Reset();
-        _settleDelay = 0;
-        ResetHerd();
+        BindHerd();
         Refresh();
         Interface.Menu.ShowTitle();
     }
@@ -112,9 +121,8 @@ public partial class Workshop : Node2D
     {
         if (Session.Phase == ShiftPhase.Working && !Interface.Menu.IsOpen) Interface.Menu.ShowPause();
     }
-    private void ResetHerd()
+    private void BindHerd()
     {
-        Herd = new PigHerd(HerdLayout.Initial);
         Bench.Bind(Herd.Pigs);
     }
     private void Resume()
@@ -126,21 +134,17 @@ public partial class Workshop : Node2D
     private void RequestEnd()
     {
         if (Session.Phase != ShiftPhase.Working) return;
-        if (_hammer.Pending)
+        if (_run.Hammer.Pending)
         {
             Interface.Hud.Notify("等待落锤完成");
             return;
         }
         if (Session.Stamina > 0 && Interface.Menu.Page != MenuPage.EndDay)
             Interface.Menu.ShowEndDay(Session.Stamina);
-        else Settle();
+        else if (_run.EndShift()) ShowSettlement();
     }
-    private void Settle()
+    private void ShowSettlement()
     {
-        if (Session.Phase != ShiftPhase.Working) return;
-        _hammer.Reset();
-        _settleDelay = 0;
-        Session.CloseShift();
         Interface.Hud.Hide();
         Refresh();
         if (Session.Phase == ShiftPhase.Choosing) Interface.Menu.ShowRewards(Snapshot);
@@ -198,34 +202,20 @@ public partial class Workshop : Node2D
         if (!active) _audio.StopSwing();
         if (active)
         {
-            Herd.Advance(dt);
             Bench.Tick(dt);
-            if (Session.Stamina > 0 && overTable &&
-                _hammer.Begin(_pointerPosition))
+            bool startsSwing = Session.Stamina > 0 && overTable && !_run.Hammer.Pending && _run.Hammer.Cooldown <= 0;
+            var outcome = _run.Advance(dt, overTable ? worldPoint : null);
+            if (startsSwing) _audio.PlaySwing();
+            if (outcome != null)
             {
-                _strikePoint = worldPoint;
-                _audio.PlaySwing();
-            }
-            if (_hammer.Advance(dt, Session.RecoveryReduction) &&
-                Session.TrySwing(Herd.Targets(_strikePoint, Bench.Radius), out var result, out int coins))
-            {
-                Herd.Apply(result!);
-                Bench.Impact(_strikePoint, result!);
-                _audio.PlayImpact(result!);
-                var impactPoint = _strikePoint;
-                Interface.Hud.ShowImpact(() => Bench.ScreenPosition(impactPoint), result!, coins);
+                _strikeFeedback.Present(outcome);
                 Refresh();
-                if (Session.Stamina == 0) _settleDelay = .75f;
             }
-            if (_settleDelay > 0)
-            {
-                _settleDelay -= dt;
-                if (_settleDelay <= 0) Settle();
-            }
+            if (Session.Phase != ShiftPhase.Working) ShowSettlement();
         }
-        Bench.Aim = _hammer.Pending ? Bench.ScreenPosition(_strikePoint) : _pointerPosition;
-        Bench.Windup = _hammer.Windup;
-        Bench.Cooldown = _hammer.Cooldown;
+        Bench.Aim = _run.Hammer.Pending ? Bench.ScreenPosition(_run.StrikePoint) : _pointerPosition;
+        Bench.Windup = _run.Hammer.Windup;
+        Bench.Cooldown = _run.Hammer.Cooldown;
         Bench.Present();
     }
 }

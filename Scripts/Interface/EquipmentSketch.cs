@@ -2,13 +2,13 @@ using Godot;
 
 public partial class EquipmentSketch : Control
 {
-    public string ProductId { get; set; } = "";
+    public string Appearance { get; set; } = "hammer";
     public override void _Draw()
     {
         var c = Size / 2;
         DrawArc(c, 85, 0, Mathf.Tau, 64, new Color(.7f, .6f, .4f, .17f), 1, true);
-        var appearance = EquipmentVisuals.For(ProductId);
-        if (appearance == EquipmentAppearance.Hammer)
+        var appearance = Appearance;
+        if (appearance == "hammer")
         {
             DrawLine(c + new Vector2(-10, -30), c + new Vector2(65, 65), new("62412c"), 24, true);
             DrawLine(c + new Vector2(-12, -33), c + new Vector2(60, 60), new("aa7849"), 15, true);

@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Linq;
+using System.Collections.Generic;
 using static WorkshopStyle;
 
 public enum MenuPage { None, Title, Receipt, Equipment, Skills, Reward, Ledger, Pause, Help, EndDay, Restart }
@@ -8,11 +9,12 @@ public enum MenuPage { None, Title, Receipt, Equipment, Skills, Reward, Ledger, 
 /// <summary>Owns menu navigation and display. It emits commands without changing a game session.</summary>
 public partial class WorkshopMenu : Control
 {
+    public IReadOnlyList<PigDefinition> PigDefinitions { get; set; } = Array.Empty<PigDefinition>();
     public bool SpatialCatalogs { get; set; }
     public event Action? Start, EndDay, Restart, Resume, Equipment, Skills, Fullscreen, Quit;
     public event Action<string, int>? Purchase;
     public event Action<string>? Learn;
-    public event Action<Perk>? Choose;
+    public event Action<string>? Choose;
     public MenuPage Page { get; private set; }
     public bool IsOpen => Page != MenuPage.None;
     public string NoticeText => _notice?.Text ?? "";
@@ -170,7 +172,7 @@ public partial class WorkshopMenu : Control
         {
             var column = Column(row, 18);
             column.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-            var illustration = new EquipmentSketch { ProductId = offer.Product.Id, CustomMinimumSize = new(0, 235), MouseFilter = MouseFilterEnum.Ignore };
+            var illustration = new EquipmentSketch { Appearance = offer.Product.Appearance, CustomMinimumSize = new(0, 235), MouseFilter = MouseFilterEnum.Ignore };
             column.AddChild(illustration);
             column.AddChild(Label(offer.Product.Name, 27));
             column.AddChild(Label($"等级 {offer.Level} / {offer.Product.MaxLevel}", 17, Muted));
@@ -193,12 +195,12 @@ public partial class WorkshopMenu : Control
         Rule(body);
         var columns = Row(body, 22);
         var offers = skills.GetSkills();
-        foreach (var group in offers.GroupBy(offer => offer.Skill.Branch).OrderBy(group => group.Key))
+        foreach (var group in offers.GroupBy(offer => offer.Skill.Branch).OrderBy(group => group.Key.Order))
         {
             var branch = group.Key;
             var column = Column(columns, 14);
             column.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-            string name = branch switch { SkillBranch.Hammer => "锤法", SkillBranch.Stamina => "耐力", SkillBranch.Income => "收益", SkillBranch.Heavy => "重击", _ => branch.ToString() };
+            string name = branch.Name;
             column.AddChild(Label(name, 24, Brass));
             foreach (var offer in group)
             {
@@ -277,7 +279,7 @@ public partial class WorkshopMenu : Control
         var row = Row(body, 24);
         foreach (var card in state.Perks)
         {
-            var button = Button("", () => Choose?.Invoke(card.Kind), "Choose_" + card.Kind);
+            var button = Button("", () => Choose?.Invoke(card.Id), "Choose_" + card.Id);
             button.CustomMinimumSize = new(0, 410);
             button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
             button.ClipContents = true;
@@ -295,7 +297,7 @@ public partial class WorkshopMenu : Control
             var column = Column(margin, 18); column.MouseFilter = MouseFilterEnum.Ignore;
             var title = Label(card.Name, 27, Brass); title.HorizontalAlignment = HorizontalAlignment.Center;
             column.AddChild(title);
-            column.AddChild(new RewardEmblem { Kind = card.Kind, CustomMinimumSize = new(0, 160), MouseFilter = MouseFilterEnum.Ignore });
+            column.AddChild(new RewardEmblem { Emblem = card.Emblem, CustomMinimumSize = new(0, 160), MouseFilter = MouseFilterEnum.Ignore });
             Rule(column);
             var description = Label(card.Description, 20, Text, true);
             description.CustomMinimumSize = new(0, 104);
@@ -343,7 +345,7 @@ public partial class WorkshopMenu : Control
     private void ShowHelp(Action back)
     {
         var body = Open(MenuPage.Help, "玩法", "", new(780, 620), back);
-        string pigs = string.Join("\n", PigCatalog.All.Select(pig =>
+        string pigs = string.Join("\n", PigDefinitions.Select(pig =>
             $"{pig.Name}：{pig.MaxHealth} 点耐久，速度 ×{pig.Speed:0.##}，击碎 ¥{pig.Coins}。"));
         body.AddChild(Label($"移动鼠标瞄准，锤子会自动连续挥动，无需点击。\n空锤也消耗体力；将鼠标移出桌面可停止新的挥锤。\n\n{pigs}\n基础锤击每次造成 1 点伤害。击碎后会不断重生。\n\n第 2、4、6、8、10 天收工时交租。余额不足则破产。\n收工后可买装备、学技能。完成全部账单即获胜。", 21, Text, true));
         Back(body, back);

@@ -13,7 +13,7 @@ public sealed class PigState
     {
         ArgumentNullException.ThrowIfNull(definition);
         if (string.IsNullOrWhiteSpace(definition.Id) || definition.MaxHealth <= 0 ||
-            definition.Coins < 0 || !float.IsFinite(definition.Speed) || definition.Speed <= 0)
+            definition.Coins < 0 || !float.IsFinite(definition.Speed) || definition.Speed <= 0 || !float.IsFinite(definition.RespawnSeconds) || definition.RespawnSeconds <= 0 || !float.IsFinite(definition.HitRadius) || definition.HitRadius < 0)
             throw new ArgumentException("A pig requires a valid ID, positive health and speed, and nonnegative rewards.", nameof(definition));
         Definition = definition;
         Respawn();

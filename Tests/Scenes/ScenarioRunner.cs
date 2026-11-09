@@ -89,9 +89,8 @@ internal static class ScenarioRunner
                 Check(g.GetWindow().Mode == Window.ModeEnum.Fullscreen, "F11 restores fullscreen");
                 Press(g, "Resume");
             }
-            Check(g.Herd.Pigs.Count == 4 && g.Herd.Pigs.Count(p => p.State.Definition.Id == "ceramic") == 2 &&
-                g.Herd.Pigs.Count(p => p.State.Definition.Id == "tin") == 1 && g.Herd.Pigs.Count(p => p.State.Definition.Id == "swift") == 1,
-                "starts with two ordinary pigs, one heavy pig and one swift pig");
+            Check(g.Herd.Pigs.Select(p => p.State.Definition).SequenceEqual(g.Content.Pigs.Spawns.Select(spawn => spawn.Definition)),
+                "starts with all species and routes registered in the injected content");
             int arrivals = 0;
             if (g.Bench is IRewardFeedback rewardFeedback) rewardFeedback.CoinCollected += () => arrivals++;
             int stamina = g.Session.Stamina;
@@ -181,8 +180,8 @@ internal static class ScenarioRunner
                 if (g.Session.Phase == ShiftPhase.Choosing)
                 {
                     if (!rewardCaptured) { await Capture(g, "11-reward"); rewardCaptured = true; }
-                    var best = g.Session.Offers.OrderBy(c => c.Kind switch { Perk.PairBonus => 0, Perk.SecondWind => 1, Perk.Lunch => 2, Perk.CoinValue => 3, Perk.WideRim => 4, _ => 5 }).First();
-                    Press(g, "Choose_" + best.Kind); continue;
+                    var best = g.Session.Offers.OrderBy(c => c.Id switch { PerkContent.PairBonus => 0, PerkContent.SecondWind => 1, PerkContent.Lunch => 2, PerkContent.CoinValue => 3, PerkContent.WideRim => 4, _ => 5 }).First();
+                    Press(g, "Choose_" + best.Id); continue;
                 }
                 if (g.Session.Phase == ShiftPhase.Shopping)
                 {
@@ -216,6 +215,7 @@ internal static class ScenarioRunner
             await Capture(g, "07-victory");
             Press(g, "Next"); Check(g.Session.IsEndless && g.Session.Shift == 11, "victory continues into endless mode");
             Press(g, "Ledger"); await Capture(g, "08-rent"); Press(g, "Back");
+            await PresentationExtensionChecks.Run(g, Check);
             GD.Print($"VERIFICATION PASS: {_checks} checks; {totalFrames} simulated frames; wallet {g.Session.Wallet}.");
             g.GetTree().Quit(0);
         }

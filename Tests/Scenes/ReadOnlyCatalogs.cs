@@ -14,6 +14,6 @@ internal sealed class ReadOnlyTraining : ISkillTreeView
 {
     public IReadOnlyList<SkillOffer> GetSkills() => Array.AsReadOnly(new[]
     {
-        new SkillOffer(new SkillDefinition("lesson", "Lesson", "", null, SkillBranch.Hammer, 0, 1, new()), SkillStatus.Available)
+        new SkillOffer(new SkillDefinition("lesson", "Lesson", "", null, SkillContent.Hammer, 0, 1, new()), SkillStatus.Available)
     });
 }

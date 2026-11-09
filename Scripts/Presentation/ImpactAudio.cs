@@ -6,6 +6,7 @@ using System.Collections.Generic;
 /// <summary>挥动、落锤、碎裂和金币采用独立声部，连续命中时允许短尾音重叠。</summary>
 public partial class ImpactAudio : AudioStreamPlayer
 {
+    public IPigAppearanceSource Appearances { private get; set; } = new PigRoster(Array.Empty<PigArchetype>());
     private readonly List<AudioStreamWav> _clips = new();
     private AudioStreamPlayer _air = null!, _crack = null!, _coins = null!;
     private AudioStreamWav _thud = null!, _empty = null!, _ceramic = null!, _metal = null!;
@@ -55,7 +56,7 @@ public partial class ImpactAudio : AudioStreamPlayer
     public void PlayImpact(SwingResult result)
     {
         int broken = result.DestroyedCount, hits = result.HitCount;
-        bool metalHit = hits > 0 && result.Targets.All(hit => hit.Pig.Definition.Id == "tin");
+        bool metalHit = hits > 0 && result.Targets.All(hit => Appearances.GetAppearance(hit.Pig.Definition.Id).Metal);
         Stream = hits > 0 ? _thud : _empty;
         PitchScale = broken >= 2 ? 0.90f : 1.0f;
         Play();

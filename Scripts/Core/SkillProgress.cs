@@ -23,14 +23,14 @@ public sealed class SkillProgress
 {
     private readonly HashSet<string> _learned = new();
     private readonly IReadOnlyList<SkillDefinition> _catalog;
-    public SkillBonus TotalBonus { get; private set; } = new();
+    public Bonus TotalBonus { get; private set; } = new();
 
     public SkillProgress(IReadOnlyList<SkillDefinition> catalog)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         var snapshot = catalog.ToArray();
         if (snapshot.Any(skill => skill == null || string.IsNullOrWhiteSpace(skill.Id) ||
-            skill.Cost < 0 || skill.Bonus == null || !ValidBonus(skill.Bonus)) ||
+            skill.Cost < 0 || skill.Bonus == null || !skill.Bonus.IsValid || skill.Branch == null || string.IsNullOrWhiteSpace(skill.Branch.Id) || skill.Tier < 0) ||
             snapshot.Select(skill => skill.Id).Distinct().Count() != snapshot.Length)
             throw new ArgumentException("Skills need unique IDs, nonnegative costs and finite bonuses.", nameof(catalog));
         var byId = snapshot.ToDictionary(skill => skill.Id);
@@ -47,12 +47,6 @@ public sealed class SkillProgress
         }
         _catalog = Array.AsReadOnly(snapshot);
     }
-
-    private static bool ValidBonus(SkillBonus bonus) =>
-        bonus.Stamina >= 0 && bonus.Damage >= 0 && bonus.Refunds >= 0 &&
-        bonus.PairCoins >= 0 && bonus.PigCoins >= 0 && bonus.TripleCoins >= 0 &&
-        float.IsFinite(bonus.Radius) && bonus.Radius >= 0 &&
-        float.IsFinite(bonus.Recovery) && bonus.Recovery >= 0;
 
     private SkillStatus Status(SkillDefinition skill, bool open, int wallet)
     {

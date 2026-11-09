@@ -13,9 +13,9 @@ internal static class PigVariantChecks
     {
         foreach (var (id, hits) in new[] { ("ceramic", 1), ("tin", 3), ("swift", 2) })
         {
-            var herd = new PigHerd(new[] { new PigSpawn(PigCatalog.Get(id), new StraightPath()) });
+            var herd = new PigHerd(new[] { new PigSpawn(PigContent.Get(id), new StraightPath()) });
             var pig = herd.Pigs.Single();
-            var session = new GameSession();
+            var session = DefaultGame.CreateSession();
             session.BeginShift();
             for (int hit = 1; hit <= hits; hit++)
             {
@@ -41,7 +41,7 @@ internal static class PigVariantChecks
             check(pig.Active && pig.State.Health == hits, $"{id} respawns with full durability");
         }
 
-        var motions = PigCatalog.All.Select(definition => new PigMotion(new(definition, new StraightPath()))).ToArray();
+        var motions = PigContent.Roster.All.Select(p => p.Definition).Select(definition => new PigMotion(new(definition, new StraightPath()))).ToArray();
         foreach (var motion in motions) motion.Advance(1);
         var ordinary = motions.Single(p => p.State.Definition.Id == "ceramic");
         var heavy = motions.Single(p => p.State.Definition.Id == "tin");
@@ -51,8 +51,8 @@ internal static class PigVariantChecks
         check(MathF.Abs(swift.Position.X / ordinary.Position.X - 1.5f) < .0001f,
             "swift pig travels at 1.5 times ordinary speed");
 
-        var armored = new PigState(PigCatalog.Get("tin"));
-        var runner = new PigState(PigCatalog.Get("swift"));
+        var armored = new PigState(PigContent.Get("tin"));
+        var runner = new PigState(PigContent.Get("swift"));
         var upgraded = StrikeResolver.Resolve(new[] { armored, runner }, 2);
         check(armored.Health == 1 && armored.IsAlive && !runner.IsAlive && upgraded.DestroyedCount == 1,
             "new pig variants respect the existing hammer damage upgrades");

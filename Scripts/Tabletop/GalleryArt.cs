@@ -124,15 +124,15 @@ public sealed class GalleryArt : System.IDisposable
         return surface.Commit();
     }
 
-    public void SkillIcon(Node3D parent, SkillBranch branch, Color color)
+    public void SkillIcon(Node3D parent, string icon, Color color)
     {
-        if (branch is SkillBranch.Hammer or SkillBranch.Heavy)
+        if (icon == "hammer")
         {
             Beam(parent, new(-0.20f, -0.23f, 0), new(0.16f, 0.19f, 0), 0.10f, color);
             var head = Box(parent, new(0.15f, 0.20f, 0), new(0.45f, 0.18f, 0.11f), color);
             head.RotationDegrees = new(0, 0, -40);
         }
-        else if (branch == SkillBranch.Stamina)
+        else if (icon == "cuff")
         {
             Box(parent, Vector3.Zero, new(0.15f, 0.50f, 0.10f), color);
             Box(parent, Vector3.Zero, new(0.49f, 0.15f, 0.10f), color);

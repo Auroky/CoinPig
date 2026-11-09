@@ -5,7 +5,7 @@ static class Program
 {
     private static int _checks;
     static void Check(bool pass, string name) { if (!pass) throw new Exception(name); _checks++; }
-    static PigState Pig(string id = "ceramic") => new(PigCatalog.Get(id));
+    static PigState Pig(string id = "ceramic") => new(PigContent.Get(id));
     static void Earn(GameSession run)
     {
         int safety = 0;
@@ -19,7 +19,7 @@ static class Program
     }
     static void Main()
     {
-        var run = new GameSession(new Random(42)); var tin = Pig("tin");
+        var run = DefaultGame.CreateSession(new Random(42)); var tin = Pig("tin");
         Check(!run.TrySwing(new[] { tin }, out _, out _) && tin.Health == 3, "invalid phase cannot damage pigs");
         Check(run.TryBuy("Rim", 0).Status == PurchaseStatus.Closed && run.Wallet == 0, "closed shop preserves wallet");
         Check(run.BeginShift() && !run.BeginShift(), "begin is not repeatable during work");
@@ -42,7 +42,7 @@ static class Program
         Check(run.Phase == ShiftPhase.Bankrupt && run.Receipt!.Shortfall == 22 && run.Wallet == 6, "rent failure keeps unpaid cash and records shortfall");
         Check(!run.BeginShift() && !run.TrySwing(new[] { tin }, out _, out _), "bankruptcy is terminal");
 
-        run = new GameSession(new Random(7)); run.BeginShift(); Earn(run); run.CloseShift();
+        run = DefaultGame.CreateSession(new Random(7)); run.BeginShift(); Earn(run); run.CloseShift();
         int before = run.Wallet;
         Check(run.TryBuy("Rim", 0).Succeeded && run.Wallet == before - 18, "purchase price debited once");
         before = run.Wallet;
@@ -59,24 +59,23 @@ static class Program
             if (day % 2 == 0) Check(run.PaidBills == day / 2, "one bill paid on due date");
             if (run.Phase == ShiftPhase.Choosing)
             {
-                Check(run.Offers.Count > 0 && run.Offers.All(x => !run.Has(x.Kind)), "offers exclude owned perks");
-                var pick = run.Offers[0].Kind; Check(run.Choose(pick) && !run.Choose(pick), "perk picked once");
+                Check(run.Offers.Count > 0 && run.Offers.All(x => !run.Has(x.Id)), "offers exclude owned perks");
+                var pick = run.Offers[0].Id; Check(run.Choose(pick) && !run.Choose(pick), "perk picked once");
             }
             if (day < 10) Check(run.BeginShift(), "next day starts");
         }
         Check(run.Phase == ShiftPhase.Won && run.PaidBills == 5 && run.NextBill == null, "ten-day victory");
         before = run.Wallet; Check(run.BeginShift() && run.IsEndless && run.Shift == 11, "endless preserves successful run");
         run.CloseShift(); Check(run.Wallet == before && run.Phase == ShiftPhase.Shopping, "endless has no extra bill");
-        var reset = new GameSession(); Check(reset.Wallet == 0 && reset.Damage == 1 && reset.Capacity == 12 && !reset.IsEndless, "restart state is clean");
+        var reset = DefaultGame.CreateSession(); Check(reset.Wallet == 0 && reset.Damage == 1 && reset.Capacity == 12 && !reset.IsEndless, "restart state is clean");
         var contract = new RentContract(new[] { new Bill(2, 10), new Bill(4, 20) });
         Check(contract.Settle(1, 100).Paid == 0 && contract.PaidCount == 0, "rent cannot be collected early");
         Check(contract.Settle(2, 9).Shortfall == 1 && contract.PaidCount == 0, "failed rent preserves outstanding bill");
         Check(contract.Settle(2, 10).Paid == 10 && contract.PaidCount == 1, "exact rent advances bill");
         Check(contract.Settle(2, 100).Paid == 0 && contract.PaidCount == 1, "same bill cannot be collected twice");
-        var herd = new PigHerd(HerdLayout.Initial);
-        Check(herd.Pigs.Count == 4 && herd.Pigs.Count(p => p.State.Definition.Id == "ceramic") == 2 &&
-            herd.Pigs.Count(p => p.State.Definition.Id == "tin") == 1 && herd.Pigs.Count(p => p.State.Definition.Id == "swift") == 1,
-            "default herd contains two ordinary pigs, one heavy pig and one swift pig");
+        var herd = new PigHerd(PigContent.Roster.Spawns);
+        Check(herd.Pigs.Select(p => p.State.Definition).SequenceEqual(PigContent.Roster.Spawns.Select(spawn => spawn.Definition)),
+            "default herd instantiates all registered spawn definitions");
         var at = herd.Pigs[0].Position;
         herd.Advance(.2f);
         Check(herd.Pigs[0].Position != at, "world movement runs without a rendering engine");
@@ -86,14 +85,15 @@ static class Program
         Check(!pig.Active, "destroyed pig leaves target set");
         herd.Advance(.9f);
         Check(pig.Active && pig.State.Health == pig.State.Definition.MaxHealth, "world lifecycle respawns pig");
-        var custom = new ShopProduct("gloves", "Gloves", "Extra stamina", 1, 0, 1, new UpgradeBonus(Stamina: 3));
-        var configured = new GameSession(products: new[] { custom });
+        var custom = new ShopProduct("gloves", "Gloves", "Extra stamina", 1, 0, 1, new Bonus(Stamina: 3));
+        var configured = DefaultGame.CreateSession(products: new[] { custom });
         configured.BeginShift(); configured.TrySwing(new[] { Pig() }, out _, out _); configured.CloseShift();
         IShop shop = configured;
         Check(shop.GetOffers().Count == 1 && shop.GetOffers()[0].Product.Id == "gloves", "shop lists injected catalogue through interface");
         Check(shop.TryBuy("gloves", 0).Succeeded && configured.Capacity == 15, "new data variant uses unchanged purchase workflow");
         ArchitectureChecks.Run(Check);
         PigVariantChecks.Run(Check);
+        SolidExtensionChecks.Run(Check);
         Console.WriteLine($"PASS: {_checks} core checks. No Godot runtime required.");
     }
 }

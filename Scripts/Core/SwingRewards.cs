@@ -1,43 +1,61 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 public readonly record struct SwingPayout(int Coins, int StaminaRefund);
 
-/// <summary>Calculates strike rewards and maintains the daily bonus limits.</summary>
+/// <summary>Rules are stateless, do not mutate targets, return nonnegative rewards and use the supplied budget.</summary>
+public interface ISwingRewardRule
+{
+    SwingPayout Calculate(StrikeSummary strike, Bonus bonus, IRewardBudget budget);
+}
+public interface IRewardBudget
+{
+    int Consume(string pool, int requested, int dailyLimit);
+}
+
+/// <summary>Composes reward policies and owns per-session, per-day usage limits.</summary>
 public sealed class SwingRewards
 {
-    private int _refunds;
-    private int _bonusKills;
-
-    public void BeginDay()
+    private readonly IReadOnlyList<ISwingRewardRule> _rules;
+    private Dictionary<string, int> _used = new();
+    public SwingRewards(IEnumerable<ISwingRewardRule> rules)
     {
-        _refunds = 0;
-        _bonusKills = 0;
+        ArgumentNullException.ThrowIfNull(rules);
+        var snapshot = rules.ToArray();
+        if (snapshot.Any(rule => rule == null)) throw new ArgumentException("Reward rules cannot be null.", nameof(rules));
+        _rules = Array.AsReadOnly(snapshot);
     }
-
-    public SwingPayout Calculate(SwingResult strike, SkillBonus skills, PerkBonus perks)
+    public void BeginDay() => _used.Clear();
+    internal sealed record Quote(SwingPayout Payout, Dictionary<string, int> Usage);
+    private sealed class Budget : IRewardBudget
     {
-        int broken = strike.DestroyedCount;
-        int coins = strike.BaseCoins + broken * skills.PigCoins;
-        int refund = 0;
-        if (perks.BonusCoinLimit > 0)
+        public Dictionary<string, int> Usage { get; }
+        public Budget(Dictionary<string, int> previous) => Usage = new(previous);
+        public int Consume(string pool, int requested, int dailyLimit)
         {
-            int rewarded = Math.Min(broken, Math.Max(0, perks.BonusCoinLimit - _bonusKills));
-            coins += rewarded;
-            _bonusKills += rewarded;
+            if (string.IsNullOrWhiteSpace(pool) || requested < 0 || dailyLimit < 0)
+                throw new ArgumentException("Reward budgets need a key and nonnegative limits.");
+            int used = Usage.GetValueOrDefault(pool);
+            int granted = Math.Min(requested, Math.Max(0, dailyLimit - used));
+            Usage[pool] = checked(used + granted);
+            return granted;
         }
-        if (broken >= 3) coins += skills.TripleCoins;
-        if (broken == 1) coins += perks.SingleCoins;
-        if (broken >= 2)
-        {
-            coins += skills.PairCoins;
-            coins += perks.PairCoins;
-            int limit = skills.Refunds + perks.Refunds;
-            if (_refunds < limit)
-            {
-                _refunds++;
-                refund = 1;
-            }
-        }
-        return new(coins, refund);
     }
+    internal Quote Prepare(SwingResult strike, Bonus bonus)
+    {
+        var budget = new Budget(_used);
+        var summary = new StrikeSummary(strike);
+        int coins = strike.BaseCoins, refunds = 0;
+        foreach (var rule in _rules)
+        {
+            var payout = rule.Calculate(summary, bonus, budget);
+            if (payout.Coins < 0 || payout.StaminaRefund < 0)
+                throw new InvalidOperationException("A reward rule returned a negative payout.");
+            coins = checked(coins + payout.Coins);
+            refunds = checked(refunds + payout.StaminaRefund);
+        }
+        return new(new(coins, refunds), budget.Usage);
+    }
+    internal void Commit(Quote quote) => _used = quote.Usage;
 }

@@ -8,7 +8,7 @@ public sealed class ShopInventory
     private readonly IReadOnlyList<ShopProduct> _catalog;
     private readonly Dictionary<string, int> _levels = new();
 
-    public UpgradeBonus TotalBonus { get; private set; } = new();
+    public Bonus TotalBonus { get; private set; } = new();
 
     public ShopInventory(IReadOnlyList<ShopProduct> catalog)
     {
@@ -16,8 +16,7 @@ public sealed class ShopInventory
         var snapshot = catalog.ToArray();
         if (snapshot.Any(product => product == null || string.IsNullOrWhiteSpace(product.Id) ||
             product.BasePrice < 0 || product.PriceStep < 0 || product.MaxLevel <= 0 ||
-            product.Bonus == null || product.Bonus.Stamina < 0 ||
-            !float.IsFinite(product.Bonus.Radius) || product.Bonus.Radius < 0) ||
+            product.Bonus == null || !product.Bonus.IsValid) ||
             snapshot.Select(product => product.Id).Distinct().Count() != snapshot.Length)
             throw new ArgumentException("Products need unique IDs, valid prices and nonnegative finite bonuses.", nameof(catalog));
         try

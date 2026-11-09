@@ -20,7 +20,7 @@ internal static class ArchitectureChecks
         catch (T) { return true; }
     }
 
-    private static PigState Pig() => new(PigCatalog.Get("ceramic"));
+    private static PigState Pig() => new(PigContent.Get("ceramic"));
 
     private static IEnumerable<PigState> InterruptedTargets(PigState pig)
     {
@@ -39,17 +39,17 @@ internal static class ArchitectureChecks
     {
         var product = new ShopProduct("gloves", "Gloves", "", 3, 0, 1, new(Stamina: 1));
         var products = new List<ShopProduct> { product };
-        var session = new GameSession(products: products);
+        var session = DefaultGame.CreateSession(products: products);
         products[0] = product with { BasePrice = 0, Bonus = new(Stamina: 99) };
         products.Clear();
         check(session.GetOffers().Single().Product == product, "shop owns a snapshot rather than the caller's mutable catalogue");
-        check(Rejects<ArgumentException>(() => new GameSession(products: new[] { product with { BasePrice = -1 } })), "negative prices are rejected before a session can mint money");
-        check(Rejects<ArgumentException>(() => new GameSession(products: new[] { product, product })), "duplicate product identities are rejected");
-        check(Rejects<ArgumentException>(() => new GameSession(products: new[] { product with { BasePrice = int.MaxValue, PriceStep = 10 } })), "overflowing price configuration is rejected");
-        check(Rejects<ArgumentException>(() => new PigState(PigCatalog.Get("ceramic") with { MaxHealth = 0 })), "invalid pig health cannot enter the world");
+        check(Rejects<ArgumentException>(() => DefaultGame.CreateSession(products: new[] { product with { BasePrice = -1 } })), "negative prices are rejected before a session can mint money");
+        check(Rejects<ArgumentException>(() => DefaultGame.CreateSession(products: new[] { product, product })), "duplicate product identities are rejected");
+        check(Rejects<ArgumentException>(() => DefaultGame.CreateSession(products: new[] { product with { BasePrice = int.MaxValue, PriceStep = 10 } })), "overflowing price configuration is rejected");
+        check(Rejects<ArgumentException>(() => new PigState(PigContent.Get("ceramic") with { MaxHealth = 0 })), "invalid pig health cannot enter the world");
 
         // The same client contract works with both default and injected catalogues.
-        foreach (var candidate in new[] { new GameSession(), session })
+        foreach (var candidate in new[] { DefaultGame.CreateSession(), session })
         {
             IShop shop = candidate;
             string id = shop.GetOffers()[0].Product.Id;
@@ -63,15 +63,15 @@ internal static class ArchitectureChecks
             check(!shop.TryBuy(id, quote.Level).Succeeded && shop.Wallet == balance, "shop contract preserves balance for a stale offer");
         }
 
-        var root = new SkillDefinition("practice", "Practice", "", null, SkillBranch.Hammer, 0, 1, new(Damage: 1));
-        var child = new SkillDefinition("collect", "Collect", "", "practice", SkillBranch.Income, 1, 2, new(PigCoins: 1));
+        var root = new SkillDefinition("practice", "Practice", "", null, SkillContent.Hammer, 0, 1, new(Damage: 1));
+        var child = new SkillDefinition("collect", "Collect", "", "practice", SkillContent.Income, 1, 2, new(PigCoins: 1));
         var skills = new List<SkillDefinition> { root, child };
-        session = new GameSession(skills: skills);
+        session = DefaultGame.CreateSession(skills: skills);
         skills.Clear();
         check(session.GetSkills().Count == 2, "skill catalogue is injectable and protected from external edits");
-        check(Rejects<ArgumentException>(() => new GameSession(skills: new[] { child })), "missing skill prerequisites are rejected");
-        check(Rejects<ArgumentException>(() => new GameSession(skills: new[] { root with { ParentId = "collect" }, child })), "cyclic skill prerequisites are rejected");
-        check(Rejects<ArgumentException>(() => new GameSession(skills: new[] { root with { Cost = -1 } })), "negative skill cost is rejected");
+        check(Rejects<ArgumentException>(() => DefaultGame.CreateSession(skills: new[] { child })), "missing skill prerequisites are rejected");
+        check(Rejects<ArgumentException>(() => DefaultGame.CreateSession(skills: new[] { root with { ParentId = "collect" }, child })), "cyclic skill prerequisites are rejected");
+        check(Rejects<ArgumentException>(() => DefaultGame.CreateSession(skills: new[] { root with { Cost = -1 } })), "negative skill cost is rejected");
         ISkillTree tree = session;
         check(tree.TryLearn("practice").Status == SkillStatus.Closed, "skill contract rejects learning during a closed phase");
         session.BeginShift(); FundDay(session);
@@ -105,14 +105,14 @@ internal static class ArchitectureChecks
         check(motion.Active, "an old hit notification cannot hide a respawned pig");
 
         // One identity can carry combined data effects; no type branch is added to the session or payout code.
-        var card = new PerkCard(Perk.Lunch, "Packed lunch", "", new(Stamina: 3, Radius: .25f,
+        var card = new PerkCard(PerkContent.Lunch, "Packed lunch", "", new(Stamina: 3, Radius: .25f,
             PairCoins: 4, SingleCoins: 3, Refunds: 1, BonusCoinLimit: 3));
         var cards = new List<PerkCard> { card };
-        session = new GameSession(perks: cards); cards.Clear();
+        session = DefaultGame.CreateSession(perks: cards); cards.Clear();
         session.BeginShift(); FundDay(session); session.BeginShift(); FundDay(session);
         check(session.Offers.Single() == card, "reward offers use a protected injected catalogue");
         check(Rejects<NotSupportedException>(() => ((IList<PerkCard>)session.Offers)[0] = card with { Bonus = new(Stamina: 99) }), "available rewards cannot be replaced through a mutable cast");
-        check(session.Choose(Perk.Lunch) && session.Capacity == 15 && session.ExtraRadius == .25f, "perk values determine passive bonuses instead of enum-specific branches");
+        check(session.Choose(PerkContent.Lunch) && session.Capacity == 15 && session.ExtraRadius == .25f, "perk values determine passive bonuses instead of enum-specific branches");
         session.BeginShift();
         session.TrySwing(new[] { Pig(), Pig() }, out _, out int coins);
         check(coins == 10 && session.Stamina == 15, "configured pair reward, limited bonus and refund compose correctly");
@@ -124,7 +124,7 @@ internal static class ArchitectureChecks
         session.TrySwing(new[] { Pig(), Pig() }, out _, out coins);
         check(coins == 10 && session.Stamina == 15, "per-day reward limits reset together on a new day");
 
-        session = new GameSession(); session.BeginShift();
+        session = DefaultGame.CreateSession(); session.BeginShift();
         var target = Pig();
         check(Rejects<InvalidOperationException>(() => session.TrySwing(InterruptedTargets(target), out _, out _)), "a broken target source rejects the command");
         check(target.Health == 1 && session.Stamina == 12 && session.Wallet == 0, "target enumeration failure leaves health and resources unchanged");

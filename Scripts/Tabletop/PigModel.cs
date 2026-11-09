@@ -4,16 +4,8 @@ using System.Collections.Generic;
 /// <summary>Mesh pose, damage feedback and respawn appearance, driven by the shared model.</summary>
 public partial class PigModel : Node3D
 {
-    private enum PigSurface { Ceramic, Tin, GoldenNose }
-    private sealed record Finish(string Color, float Scale, PigSurface Surface);
-    private static readonly IReadOnlyDictionary<string, Finish> Finishes = new Dictionary<string, Finish>
-    {
-        ["ceramic"] = new("ea9a95", 1, PigSurface.Ceramic),
-        ["tin"] = new("738b92", 1.12f, PigSurface.Tin),
-        ["swift"] = new("e8bd84", .86f, PigSurface.GoldenNose)
-    };
     private PigMotion _motion = null!;
-    private Finish _finish = null!;
+    private PigAppearance _finish = null!;
     private TabletopMaterials _materials = null!;
     private Node3D _body = null!, _key = null!, _cracks = null!;
     private readonly Node3D[] _legs = new Node3D[4];
@@ -26,14 +18,14 @@ public partial class PigModel : Node3D
     public PigMotion Motion => _motion;
     public PigState State => _motion.State;
     public Color Glaze { get; private set; }
-    public Color Interior => new(_finish.Surface == PigSurface.Tin ? "a5afb0" : "e0cbb9");
+    public Color Interior => new(_finish.Interior);
     public float BodyScale => _finish.Scale;
     private MeshInstance3D Mesh(Node3D parent, Mesh mesh, Vector3 at, Color color) => SceneShapes.Mesh(parent, mesh, at, _materials.Paint(color));
     private MeshInstance3D Box(Node3D parent, Vector3 at, Vector3 size, Color color) => SceneShapes.Box(parent, at, size, _materials.Paint(color));
     private MeshInstance3D Cylinder(Node3D parent, Vector3 at, float bottom, float top, float height, Color color, int sides = 8) => SceneShapes.Cylinder(parent, at, bottom, top, height, _materials.Paint(color), sides);
     private MeshInstance3D Beam(Node3D parent, Vector3 a, Vector3 b, float width, Color color) => SceneShapes.Beam(parent, a, b, width, _materials.Paint(color));
     private MeshInstance3D Oval(Node3D parent, Vector3 at, Vector3 radius, Color color) => SceneShapes.Ellipsoid(parent, at, radius, _materials.Paint(color));
-    public void Assemble(PigMotion motion, int index, TabletopMaterials materials)
+    public void Assemble(PigMotion motion, int index, TabletopMaterials materials, PigAppearance appearance)
     {
         _index = index;
         _motion = motion;
@@ -41,9 +33,9 @@ public partial class PigModel : Node3D
         _previous = motion.Position;
         _wasActive = motion.Active;
         _yaw = motion.Position.X > 0 ? -Mathf.Pi / 2 : Mathf.Pi / 2;
-        _finish = Finishes.TryGetValue(motion.State.Definition.Id, out var known) ? known : Finishes["ceramic"];
+        _finish = appearance;
         _font = WorkshopStyle.BodyFont();
-        Glaze = new Color(_finish.Color);
+        Glaze = new Color(_finish.Body3D);
         var contactShade = materials.ContactShade();
         AddChild(new MeshInstance3D
         {
@@ -55,7 +47,7 @@ public partial class PigModel : Node3D
         _body = new Node3D();
         AddChild(_body);
         var rosy = Glaze.Darkened(0.13f);
-        Color nose = _finish.Surface == PigSurface.GoldenNose ? new Color("e0a638") : rosy;
+        Color nose = _finish.Nose3D is string noseColor ? new Color(noseColor) : rosy;
         Oval(_body, new(0, 0.51f, -0.09f), new(0.49f, 0.44f, 0.64f), Glaze);
         Oval(_body, new(0, 0.57f, 0.35f), new(0.41f, 0.37f, 0.37f), Glaze);
         Oval(_body, new(0, 0.50f, 0.695f), new(0.234f, 0.154f, 0.125f), nose);
@@ -122,7 +114,7 @@ public partial class PigModel : Node3D
 
     private void AddSpeciesDetails()
     {
-        if (_finish.Surface == PigSurface.Tin)
+        if (_finish.Metal)
         {
             var darkMetal = new Color("3d535d");
             foreach (float side in new[] { -1f, 1f })
@@ -134,7 +126,7 @@ public partial class PigModel : Node3D
                         new(0.032f, 0.035f, 0.032f), new("d1c29f"));
             }
         }
-        else if (_finish.Surface == PigSurface.GoldenNose)
+        if (_finish.Collar)
         {
             var collar = Mesh(_body, new TorusMesh { InnerRadius = 0.28f, OuterRadius = 0.32f, Rings = 24, RingSegments = 8 },
                 new(0, 0.50f, 0.32f), new("d9a34e"));
