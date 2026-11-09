@@ -5,8 +5,8 @@ using System.Numerics;
 
 public sealed record CombatEffectDefinition(string Id, Func<ICombatEffect> Create);
 public sealed record EffectContext(float Delta, PigHerd Herd, Vector2? Aim, StrikeOutcome? WeaponStrike);
-public sealed record EffectPulse(Vector2 Point, float Radius, int Damage, IReadOnlyList<PigState> Targets, string Visual, string Name = "共振波");
-public sealed record EffectOutcome(Vector2 Point, float Radius, string Visual, SwingResult Strike, int Coins, string Name = "共振波");
+public sealed record EffectPulse(Vector2 Point, float Radius, int Damage, IReadOnlyList<PigState> Targets, string Visual, string Name = "共振波", string AudioCue = "resonance");
+public sealed record EffectOutcome(Vector2 Point, float Radius, string Visual, SwingResult Strike, int Coins, string Name = "共振波", string AudioCue = "resonance");
 public interface ICombatEffect
 {
     IEnumerable<EffectPulse> Advance(EffectContext context);

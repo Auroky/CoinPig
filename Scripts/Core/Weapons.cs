@@ -48,10 +48,10 @@ public sealed class CircularWeaponAttack : IWeaponAttack
 }
 
 public sealed record WeaponDefinition(string Id, string Name, IWeaponAttack Attack,
-    string Appearance = "hammer", string Motion = "swing");
+    string Appearance = "hammer", string Motion = "swing", string AudioCue = "hammer");
 public sealed record EquipmentPalette(string Body, string Trim, string Metal, string Grip, string Glow);
 public sealed record EquipmentTier(string Name, EquipmentPalette Palette, string Description = "",
-    IReadOnlyList<CombatEffectDefinition>? Effects = null);
+    IReadOnlyList<CombatEffectDefinition>? Effects = null, Bonus? UpgradeBonus = null);
 public sealed record ProductRequirement(string ProductId, int Level);
 public sealed record WeaponLoadout(WeaponDefinition Weapon, int Level, EquipmentPalette Palette, string? ProductId);
 

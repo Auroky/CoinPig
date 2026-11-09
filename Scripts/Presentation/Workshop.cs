@@ -229,7 +229,7 @@ public partial class Workshop : Node2D
             foreach (var effect in _run.EffectOutcomes)
             {
                 if (Bench is ICombatEffectFeedback feedback) feedback.PresentEffect(effect);
-                if (effect.Strike.HitCount > 0) _audio.PlayImpact(effect.Strike);
+                _audio.PlayEffect(effect);
                 if (effect.Coins > 0) Interface.Hud.ShowEffect(() => Bench.ScreenPosition(effect.Point), effect);
                 Refresh();
             }

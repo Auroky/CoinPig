@@ -34,6 +34,7 @@ internal static class EquipmentScenario
         try
         {
             await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame);
+            EquipmentAudioChecks.Run(g, Check);
             if (DisplayServer.GetName() != "headless")
             {
                 g.GetWindow().Mode = Window.ModeEnum.Windowed;
@@ -75,6 +76,10 @@ internal static class EquipmentScenario
                 Move(g, g.Bench.ScreenPosition(g.Herd.Pigs.First(p => p.Active))); g._Process(.05);
             }
             Check(g.Session.Stamina == stamina - 1, "chainsaw cuts automatically with its configured one-energy cost, without a mouse button");
+            var circle = (TorusMesh)renderer.GetChildren().OfType<MeshInstance3D>().Single(m => m.Mesh is TorusMesh).Mesh;
+            float sawRadius = g.Session.Radius; int sawCapacity = g.Session.Capacity;
+            Check(MathF.Abs(circle.OuterRadius - (sawRadius + .014f)) < .001f && sawRadius >= 2.4f - .001f,
+                $"the actual 3D chainsaw circle displays the enlarged damage radius (ring={circle.OuterRadius:0.000}, damage={sawRadius:0.000})");
             await Capture(g, "03-chainsaw-gameplay");
             Move(g, new(-100, -100)); Tick(g, 1);
             stamina = g.Session.Stamina; wallet = g.Session.Wallet;
@@ -88,17 +93,25 @@ internal static class EquipmentScenario
             {
                 Move(g, g.Bench.ScreenPosition(g.Herd.Pigs.First(p => p.Active))); g._Process(.05);
             }
-            Check(g.Session.Stamina == stamina - 2 && g.Session.Damage == 3,
-                "grinder uses area-grinding damage and its own two-energy cost in the actual scene");
+            Check(g.Session.Stamina == stamina - 1 && g.Session.Damage == 5,
+                "grinder uses area-grinding damage and one-energy cost in the actual scene");
+            circle = (TorusMesh)renderer.GetChildren().OfType<MeshInstance3D>().Single(m => m.Mesh is TorusMesh).Mesh;
+            Check(g.Session.Radius > sawRadius && g.Session.Capacity > sawCapacity && MathF.Abs(circle.OuterRadius - (g.Session.Radius + .014f)) < .001f,
+                "moving from upgraded chainsaw to grinder increases both the visible circle and energy capacity");
             await Capture(g, "05-grinder-gameplay");
             var registry = EquipmentModelRegistry.CreateDefault().Register("custom-tool", new ChainsawEquipmentBuilder());
             renderer.Models = registry;
             renderer.SetEquipment(new(new("custom", "Custom", new CircularWeaponAttack(), "custom-tool"), 2,
                 EquipmentContent.Products[0].TierAt(1).Palette, null), null);
             Check(renderer.Appearance == "custom-tool", "a new registered model key is accepted without editing the weapon renderer");
+            // Audio playback is released by the mixer asynchronously; drain it before the test quits.
+            g.SetProcess(false);
+            foreach (var audio in g.GetChildren().OfType<ImpactAudio>()) audio.Clear();
+            await g.ToSignal(g.GetTree().CreateTimer(.08), SceneTreeTimer.SignalName.Timeout);
             GD.Print($"EQUIPMENT VERIFICATION PASS: {_checks} checks.");
             g.GetTree().Quit(0);
         }
         catch (Exception ex) { GD.PushError("EQUIPMENT VERIFICATION FAILED: " + ex); g.GetTree().Quit(1); }
     }
 }
+

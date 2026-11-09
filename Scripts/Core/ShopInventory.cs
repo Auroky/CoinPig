@@ -19,6 +19,7 @@ public sealed class ShopInventory
             product.BasePrice < 0 || product.PriceStep < 0 || product.MaxLevel <= 0 ||
             product.Bonus == null || !product.Bonus.IsValid || product.Stage <= 0 || !float.IsFinite(product.DisplayYaw) ||
             (product.Tiers != null && (product.Tiers.Count != product.MaxLevel || product.Tiers.Any(t => t == null || t.Palette == null || !ValidPalette(t.Palette) ||
+                (t.UpgradeBonus != null && !t.UpgradeBonus.IsValid) ||
                 (t.Effects != null && t.Effects.Any(e => e == null || e.Create == null || string.IsNullOrWhiteSpace(e.Id)))))) ||
             (product.Weapon != null && (string.IsNullOrWhiteSpace(product.Weapon.Id) || product.Weapon.Attack == null))) ||
             snapshot.Select(product => product.Id).Distinct().Count() != snapshot.Length)
@@ -67,9 +68,8 @@ public sealed class ShopInventory
     {
         get
         {
-            var bonus = new Bonus(); var product = EquippedProduct;
-            if (product != null) for (int i = 0; i < Level(product.Id); i++) bonus = bonus.Add(product.Bonus);
-            return bonus;
+            var product = EquippedProduct;
+            return product?.BonusThrough(Level(product.Id)) ?? new Bonus();
         }
     }
     public string LockReason(ShopProduct product) => string.Join("、", (product.Requirements ?? Array.Empty<ProductRequirement>())
@@ -100,7 +100,7 @@ public sealed class ShopInventory
         var status = Availability(product, wallet, open);
         if (status != PurchaseStatus.Available) return new(status);
         int price = product.PriceAt(expectedLevel);
-        var updated = product.Weapon == null ? TotalBonus.Add(product.Bonus) : TotalBonus;
+        var updated = product.Weapon == null ? TotalBonus.Add(product.BonusAt(expectedLevel)) : TotalBonus;
         _levels[product.Id] = Level(product.Id) + 1;
         TotalBonus = updated;
         if (product.Weapon != null && (EquippedProduct == null || product.Stage > EquippedProduct.Stage))

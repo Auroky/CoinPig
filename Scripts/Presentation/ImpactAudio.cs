@@ -7,11 +7,15 @@ using System.Collections.Generic;
 public partial class ImpactAudio : AudioStreamPlayer
 {
     public IPigAppearanceSource Appearances { private get; set; } = new PigRoster(Array.Empty<PigArchetype>());
+    public EquipmentSounds Sounds { get; init; } = EquipmentSounds.CreateDefault();
+    internal string WeaponCue { get; private set; } = "hammer";
+    internal string LastImpactCue { get; private set; } = "";
+    internal AudioStreamWav ImpactClip(string cue) => VoiceFor(cue).Impact;
+    internal AudioStream? EffectStream => _effect.Stream;
     private readonly List<AudioStreamWav> _clips = new();
-    private AudioStreamPlayer _air = null!, _crack = null!, _coins = null!;
-    private AudioStreamWav _thud = null!, _empty = null!, _ceramic = null!, _metal = null!;
-    private readonly Dictionary<string, AudioStreamWav> _toolVoices = new();
-    private AudioStreamWav _normalSwing = null!;
+    private AudioStreamPlayer _air = null!, _crack = null!, _coins = null!, _effect = null!;
+    private AudioStreamWav _empty = null!, _ceramic = null!, _metal = null!;
+    private readonly Dictionary<string, (AudioStreamWav Swing, AudioStreamWav Impact)> _toolVoices = new();
 
     public override void _Ready()
     {
@@ -19,13 +23,11 @@ public partial class ImpactAudio : AudioStreamPlayer
         _air = Voice(-13, 1);
         _crack = Voice(-7, 4);
         _coins = Voice(-10, 4);
-        _normalSwing = MakeClip(0.18, (t, noise) => noise * Math.Sin(Math.PI * t / 0.18) * 0.34);
-        _air.Stream = _normalSwing;
-        _toolVoices["cut"] = MakeClip(.23, (t, noise) => (Math.Sin(t * 2 * Math.PI * 130) * .2 + noise * .28) * Math.Exp(-t * 6));
-        _toolVoices["grind"] = MakeClip(.34, (t, noise) => (Math.Sin(t * 2 * Math.PI * 510) * .11 + noise * .29) * Math.Exp(-t * 5));
-        _thud = MakeClip(0.24, (t, noise) =>
-            Math.Sin(2 * Math.PI * (82 * t + 3.5 * (1 - Math.Exp(-t * 42)))) * Math.Exp(-t * 23) * 0.72 +
-            noise * Math.Exp(-t * 100) * 0.36);
+        _effect = Voice(-4, 3);
+        foreach (var entry in Sounds.All)
+            _toolVoices[entry.Key] = (MakeClip(entry.Value.Swing.Seconds, entry.Value.Swing.Sample),
+                MakeClip(entry.Value.Impact.Seconds, entry.Value.Impact.Sample));
+        _air.Stream = VoiceFor(WeaponCue).Swing;
         _empty = MakeClip(0.15, (t, noise) => Math.Sin(2 * Math.PI * 145 * t) * Math.Exp(-t * 32) * 0.28 + noise * Math.Exp(-t * 75) * 0.13);
         _ceramic = MakeClip(0.29, (t, noise) =>
             (noise * 0.5 + Math.Sin(2 * Math.PI * 870 * t) * 0.17 + Math.Sin(2 * Math.PI * 1770 * t) * 0.08) *
@@ -56,16 +58,34 @@ public partial class ImpactAudio : AudioStreamPlayer
     }
 
     public void PlaySwing() => _air.Play();
-    public void SetWeapon(WeaponLoadout weapon) => _air.Stream = _toolVoices.TryGetValue(weapon.Weapon.Motion, out var voice) ? voice : _normalSwing;
+    private (AudioStreamWav Swing, AudioStreamWav Impact) VoiceFor(string cue) =>
+        _toolVoices.TryGetValue(cue, out var voice) ? voice : _toolVoices["hammer"];
+    public void SetWeapon(WeaponLoadout weapon)
+    {
+        WeaponCue = weapon.Weapon.AudioCue;
+        _air.Stream = VoiceFor(WeaponCue).Swing;
+    }
     public void StopSwing() => _air.Stop();
 
     public void PlayImpact(SwingResult result)
     {
+        LastImpactCue = WeaponCue;
+        Stream = result.HitCount > 0 ? VoiceFor(WeaponCue).Impact : _empty;
+        PitchScale = result.DestroyedCount >= 2 ? 0.94f : 1.0f;
+        Play();
+        PlayDebris(result);
+    }
+    public void PlayEffect(EffectOutcome effect)
+    {
+        LastImpactCue = effect.AudioCue;
+        _effect.Stream = VoiceFor(effect.AudioCue).Impact;
+        _effect.Play();
+        PlayDebris(effect.Strike);
+    }
+    private void PlayDebris(SwingResult result)
+    {
         int broken = result.DestroyedCount, hits = result.HitCount;
         bool metalHit = hits > 0 && result.Targets.All(hit => Appearances.GetAppearance(hit.Pig.Definition.Id).Metal);
-        Stream = hits > 0 ? _thud : _empty;
-        PitchScale = broken >= 2 ? 0.90f : 1.0f;
-        Play();
         if (hits > 0)
         {
             _crack.Stream = metalHit ? _metal : _ceramic;
@@ -85,6 +105,7 @@ public partial class ImpactAudio : AudioStreamPlayer
         _air.Stop();
         _crack.Stop();
         _coins.Stop();
+        _effect.Stop();
     }
 
     private AudioStreamWav MakeClip(double seconds, Func<double, double, double> sample)

@@ -87,7 +87,7 @@ public sealed class WorkshopRun
                 if (Session.ApplyEffect(pulse, out var effectStrike, out int effectCoins))
                 {
                     Herd.Apply(effectStrike!);
-                    effectResults.Add(new(pulse.Point, pulse.Radius, pulse.Visual, effectStrike!, effectCoins, pulse.Name));
+                    effectResults.Add(new(pulse.Point, pulse.Radius, pulse.Visual, effectStrike!, effectCoins, pulse.Name, pulse.AudioCue));
                 }
         EffectOutcomes = Array.AsReadOnly(effectResults.ToArray());
         if (_settleDelay > 0)
