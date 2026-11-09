@@ -8,10 +8,7 @@ public static class BalanceContent
         SettlementDelay: .75f, AimLockSeconds: .06f, OpeningDelay: 1.0f, RetargetSettleSeconds: .10f, RetargetSpeed: 7);
     public static IReadOnlyList<Bill> Bills { get; } = Array.AsReadOnly(new Bill[]
     {
-        new(2, 28), new(4, 56), new(6, 84), new(8, 128), new(10, 156),
-        new(12, 200), new(14, 260), new(16, 330), new(18, 420), new(20, 500),
-        new(22, 620), new(24, 760), new(26, 920), new(28, 1100), new(30, 1300)
+        new(2, 28), new(4, 56), new(6, 84), new(8, 128), new(10, 156)
     });
-    public static IRentContinuation Renewal { get; } = new CompoundingRent(2, 8, 20, 10);
 }
 

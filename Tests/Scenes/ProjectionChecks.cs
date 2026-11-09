@@ -16,8 +16,8 @@ internal static class ProjectionChecks
             for (int day = 1; day <= definition.ContractLength; day++)
             {
                 direct.BeginShift(); projected.BeginShift();
-                var firstHerd = new PigHerd(PigContent.Roster.Spawns);
-                var secondHerd = new PigHerd(PigContent.Roster.Spawns);
+                var firstHerd = new PigHerd(PigContent.Roster.SpawnsForShift(day));
+                var secondHerd = new PigHerd(PigContent.Roster.SpawnsForShift(day));
                 int frames = 0;
                 while (direct.Stamina > 0 && frames++ < 20000)
                 {

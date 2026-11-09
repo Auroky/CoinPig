@@ -24,6 +24,6 @@ public interface ISessionView
 public interface IGameFactory
 {
     GameSession CreateSession();
-    PigHerd CreateHerd();
+    PigHerd CreateHerd(int shift = 1);
     SwingTiming Timing { get; }
 }

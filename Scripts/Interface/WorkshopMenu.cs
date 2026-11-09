@@ -133,7 +133,7 @@ public partial class WorkshopMenu : Control
         bool complete = state.Phase == ShiftPhase.Won;
         string title = failed ? "租约终止" : complete ? "本期租约完成" : $"第 {state.Day} 天 · 结算";
         var body = Open(MenuPage.Receipt, title, failed ? $"本期租金还差 ¥{receipt.Shortfall}" : complete
-            ? $"{state.ContractLength} 关租约完成 · 可继续接受涨租挑战" : "今日营业结束", new(600, 640));
+            ? $"{state.ContractLength} 局租约完成 · 无尽模式不再收租" : "今日营业结束", new(600, 640));
         body.AddThemeConstantOverride("separation", 12);
         Rule(body);
         AddLedgerLine(body, "击碎", $"{receipt.Pigs} 只");
@@ -152,7 +152,7 @@ public partial class WorkshopMenu : Control
             row.AddChild(shop);
             row.AddChild(skills);
         }
-        if (!failed) body.AddChild(Button(complete ? "续租并继续经营" : "开始下一天", () => Start?.Invoke(), "Next", true));
+        if (!failed) body.AddChild(Button(complete ? "进入无尽模式" : "开始下一天", () => Start?.Invoke(), "Next", true));
         if (failed || complete) body.AddChild(Button("重新开始", () => Restart?.Invoke(), "Restart", failed));
     }
 
@@ -311,7 +311,7 @@ public partial class WorkshopMenu : Control
             if (!due.Paid && upcoming == null) upcoming = line;
         }
         if (upcoming != null) Callable.From(() => { if (GodotObject.IsInstanceValid(scroll)) scroll.EnsureControlVisible(upcoming); }).CallDeferred();
-        body.AddChild(Label("完成正式租约后可续租，后续租金继续增长。", 17, Muted, true));
+        body.AddChild(Label("第 10 局结清房租后进入无尽模式，不再收租。", 17, Muted, true));
         Rule(body);
         Back(body, returnToPrevious, back == null ? "返回营业" : "返回工坊");
     }
@@ -345,7 +345,7 @@ public partial class WorkshopMenu : Control
         var body = Open(MenuPage.Help, "玩法", "", new(780, 620), back);
         string pigs = string.Join("\n", PigDefinitions.Select(pig =>
             $"{pig.Name}：{pig.MaxHealth} 点耐久，速度 ×{pig.Speed:0.##}，击碎 ¥{pig.Coins}。"));
-        body.AddChild(Label($"移动鼠标瞄准，工具会自动连续攻击，无需点击。\n开局有准备时间，瞄准猪后才开始；快速换目标会短暂缓攻。\n空击也消耗体力；将鼠标移出桌面可停止新的攻击。\n\n{pigs}\n工具升级会提高伤害、范围和体力，技能可叠加。\n当前商店的工具每次攻击均耗能 1。\n护腕共振每局有次数上限，升级后强化效果。\n\n每两关结租一次，租金随关卡逐步提高；具体账单按 B 查看。\n余额不足则破产，收工后可买装备、学技能。\n完成正式租约后可继续涨租挑战，保留金币和全部升级。", 21, Text, true));
+        body.AddChild(Label($"移动鼠标瞄准，工具会自动连续攻击，无需点击。\n开局有准备时间，瞄准猪后才开始；快速换目标会短暂缓攻。\n空击也消耗体力；将鼠标移出桌面可停止新的攻击。\n\n{pigs}\n工具升级会提高伤害、范围和体力，技能可叠加。\n当前商店的工具每次攻击均耗能 1。\n护腕共振每局有次数上限，升级后强化效果。\n\n主线共 10 局，每 2 局交租，第 10 局支付最后一笔；按 B 查看账单。\n余额不足则破产，收工后可买装备、学技能。\n中途交租成功后可选能力；第 6 局起加入装甲猪。\n结清房租后进入无尽模式，保留金币和升级，不再收租。", 21, Text, true));
         Back(body, back);
     }
 }

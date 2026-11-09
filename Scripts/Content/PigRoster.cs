@@ -18,8 +18,13 @@ public sealed class PigArchetype
     public PigDefinition Definition { get; }
     public PigAppearance Appearance { get; }
     public IReadOnlyList<IMotionPath> Routes { get; }
+    public int FirstShift { get; }
     public PigArchetype(PigDefinition definition, PigAppearance appearance, params IMotionPath[] routes)
+        : this(definition, appearance, 1, routes) { }
+    public PigArchetype(PigDefinition definition, PigAppearance appearance, int firstShift, params IMotionPath[] routes)
     {
+        if (firstShift <= 0) throw new ArgumentOutOfRangeException(nameof(firstShift));
+        FirstShift = firstShift;
         ArgumentNullException.ThrowIfNull(appearance);
         ArgumentNullException.ThrowIfNull(routes);
         _ = new PigState(definition);
@@ -48,7 +53,13 @@ public sealed class PigRoster : IPigAppearanceSource
         All = Array.AsReadOnly(snapshot);
         _byId = snapshot.ToDictionary(pig => pig.Definition.Id);
         _fallback = fallback ?? new PigAppearance();
-        Spawns = Array.AsReadOnly(snapshot.SelectMany(pig => pig.Routes.Select(route => new PigSpawn(pig.Definition, route))).ToArray());
+        Spawns = SpawnsForShift(1);
+    }
+    public IReadOnlyList<PigSpawn> SpawnsForShift(int shift)
+    {
+        if (shift <= 0) throw new ArgumentOutOfRangeException(nameof(shift));
+        return Array.AsReadOnly(All.Where(pig => pig.FirstShift <= shift)
+            .SelectMany(pig => pig.Routes.Select(route => new PigSpawn(pig.Definition, route))).ToArray());
     }
     public PigDefinition Get(string id) => _byId.TryGetValue(id, out var pig) ? pig.Definition :
         throw new KeyNotFoundException($"Unknown pig species: {id}");

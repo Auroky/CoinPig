@@ -16,7 +16,7 @@ internal static class EquipmentChecks
         readonly SessionDefinition _definition; readonly PigSpawn[] _spawns;
         public FixedFactory(SessionDefinition definition, PigSpawn[] spawns) { _definition = definition; _spawns = spawns; }
         public GameSession CreateSession() => new(_definition, new Random(8));
-        public PigHerd CreateHerd() => new(_spawns);
+        public PigHerd CreateHerd(int shift = 1) => new(_spawns);
         public SwingTiming Timing => BalanceContent.Timing;
     }
     private static PigSpawn At(string species, Vector2 point) => new(PigContent.Get(species), new HarmonicPath(point, Vector2.Zero, Vector2.Zero, Vector2.Zero));

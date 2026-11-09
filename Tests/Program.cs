@@ -64,9 +64,9 @@ static class Program
             }
             if (day < run.ContractLength) Check(run.BeginShift(), "next day starts");
         }
-        Check(run.Phase == ShiftPhase.Won && run.PaidBills == BalanceContent.Bills.Count && run.NextBill?.Shift == run.ContractLength + 2, "full contract victory keeps the renewal bill visible");
+        Check(run.Phase == ShiftPhase.Won && run.PaidBills == BalanceContent.Bills.Count && run.NextBill == null, "full contract victory clears all rent");
         before = run.Wallet; Check(run.BeginShift() && run.IsEndless && run.Shift == run.ContractLength + 1, "endless preserves successful run");
-        run.CloseShift(); Check(run.Wallet == before && run.Phase == ShiftPhase.Shopping, "renewal rest day does not charge before the next due date");
+        run.CloseShift(); Check(run.Wallet == before && run.Phase == ShiftPhase.Shopping, "endless play does not charge rent");
         var reset = DefaultGame.CreateSession(); Check(reset.Wallet == 0 && reset.Damage == 1 && reset.Capacity == BalanceContent.Tuning.StartingStamina && !reset.IsEndless, "restart state is clean");
         var contract = new RentContract(new[] { new Bill(2, 10), new Bill(4, 20) });
         Check(contract.Settle(1, 100).Paid == 0 && contract.PaidCount == 0, "rent cannot be collected early");
@@ -97,6 +97,7 @@ static class Program
         GameplayControlChecks.Run(Check);
         EquipmentChecks.Run(Check);
         LeaseChecks.Run(Check);
+        CampaignChecks.Run(Check);
         Console.WriteLine($"PASS: {_checks} core checks. No Godot runtime required.");
     }
 }

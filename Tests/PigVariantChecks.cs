@@ -11,7 +11,7 @@ internal static class PigVariantChecks
 
     public static void Run(Action<bool, string> check)
     {
-        foreach (var (id, hits) in new[] { ("ceramic", 1), ("tin", 3), ("swift", 2) })
+        foreach (var (id, hits) in new[] { ("ceramic", 1), ("tin", 3), ("swift", 2), ("armored", 5) })
         {
             var herd = new PigHerd(new[] { new PigSpawn(PigContent.Get(id), new StraightPath()) });
             var pig = herd.Pigs.Single();

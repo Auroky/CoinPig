@@ -32,7 +32,7 @@ internal static class SolidExtensionChecks
         public SwingTiming Timing { get; } = new(.1f, .15f, .05f, .2f);
         public TestFactory(SessionDefinition definition, IReadOnlyList<PigSpawn> spawns) { _definition = definition; _spawns = spawns; }
         public GameSession CreateSession() => new(_definition, new Random(23));
-        public PigHerd CreateHerd() => new(_spawns);
+        public PigHerd CreateHerd(int shift = 1) => new(_spawns);
     }
     private static PigState Pig() => new(PigContent.Get("ceramic"));
     private static bool Rejects<T>(Action action) where T : Exception

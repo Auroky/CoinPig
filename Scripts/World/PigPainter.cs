@@ -36,7 +36,7 @@ public static class PigPainter
         if (pig.State.Definition.MaxHealth > 1)
         {
             for (int i = 0; i < pig.State.Definition.MaxHealth; i++)
-                canvas.DrawCircle(new(-9 + i * 9, 33), 3, i < pig.State.Health ? new("d9bd7d") : new Color(0, 0, 0, .3f));
+                canvas.DrawCircle(new(-(pig.State.Definition.MaxHealth - 1) * 4.5f + i * 9, 33), 3, i < pig.State.Health ? new("d9bd7d") : new Color(0, 0, 0, .3f));
         }
         canvas.DrawSetTransform(Vector2.Zero);
     }

@@ -110,6 +110,7 @@ internal static class ScenarioRunner
             var position = g.Herd.Pigs[0].Position; Tick(g, 1);
             Check(g.Session.Stamina == stamina && g.Herd.Pigs[0].Position == position, "pause freezes automatic swings and actors");
             Press(g, "Help");
+            await Capture(g, "03-help");
             Input.ParseInputEvent(new InputEventKey { Keycode = Key.Escape, Pressed = true });
             await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame);
             Check(g.Interface.Menu.Page == MenuPage.Pause, "help returns to pause without checking text");
@@ -180,7 +181,7 @@ internal static class ScenarioRunner
             await Capture(g, "06-bankrupt"); Press(g, "Restart"); Press(g, "Start");
 
             int totalFrames = 0;
-            bool rewardCaptured = false;
+            bool rewardCaptured = false, armoredCaptured = false;
             while (g.Session.Phase != ShiftPhase.Won && totalFrames < 70000)
             {
                 if (g.Session.Phase == ShiftPhase.Bankrupt) throw new Exception("heuristic bot bankrupt on day " + g.Session.Shift);
@@ -205,6 +206,12 @@ internal static class ScenarioRunner
                     if (offer != null) { Press(g, "Equipment"); Press(g, "Buy_" + offer.Product.Id); Press(g, "Back"); }
                     Press(g, "Next"); await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame); continue;
                 }
+                if (!armoredCaptured && g.Session.Shift == 6)
+                {
+                    Check(g.Herd.Pigs.Count(p => p.State.Definition.Id == "armored") == 1,
+                        "one armored pig joins the rendered herd at shift six");
+                    await Capture(g, "13-armored"); armoredCaptured = true;
+                }
                 var visible = g.Herd.Pigs.Where(p => p.Active).ToArray();
                 System.Numerics.Vector2 bestPoint = default; float bestScore = -1;
                 var candidates = visible.Select(p => p.Position).Concat(visible.SelectMany(a => visible.Select(b => (a.Position + b.Position) / 2)));
@@ -221,29 +228,17 @@ internal static class ScenarioRunner
             Check(g.Session.Phase == ShiftPhase.Won && g.Session.PaidBills == g.Content.Definition.Bills.Count, "normal aiming bot completes the full configured contract");
             await Capture(g, "07-victory");
             Press(g, "Next"); Check(g.Session.IsEndless && g.Session.Shift == g.Session.ContractLength + 1, "victory continues into endless mode");
-            Check(g.Session.NextBill != null && g.Session.NextBill.Shift > g.Session.ContractLength,
-                "continued play has a real upcoming renewal bill instead of a cleared ledger");
+            Check(g.Session.NextBill == null && armoredCaptured, "endless begins after ten days with no more bills");
             Press(g, "Ledger"); await Capture(g, "08-rent"); Press(g, "Back");
-            var renewal = g.Session.NextBill!;
-            Press(g, "EndDay"); Press(g, "ConfirmEnd");
-            Check(g.Session.Receipt!.Paid == 0 && g.Session.Phase == ShiftPhase.Shopping,
-                "first renewal rest day does not charge ahead of its due date");
-            Press(g, "Next"); int renewalBalance = g.Session.Wallet;
-            Press(g, "EndDay"); Press(g, "ConfirmEnd");
-            Check(g.Session.Receipt!.Due == renewal.Amount &&
-                (renewalBalance >= renewal.Amount ? g.Session.Receipt.Paid == renewal.Amount : g.Session.Receipt.Shortfall == renewal.Amount - renewalBalance),
-                "actual renewal scene charges the configured bill or reports its exact shortfall");
-            Check(g.Session.Phase != ShiftPhase.Won, "renewal payment cannot loop back into a free victory state");
-            g.Interface.Menu.ShowLedger(SessionSnapshot.From(g.Session), () => g.Interface.Menu.ShowReceipt(SessionSnapshot.From(g.Session)));
-            await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame);
-            await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame);
-            var rentScroll = g.Interface.FindChildren("RentScroll", "ScrollContainer", true, false).OfType<ScrollContainer>().First(s => s.IsVisibleInTree());
-            Check(rentScroll.Size.X > 400 && rentScroll.GetVScrollBar().MaxValue > rentScroll.Size.Y && g.Session.GetRentSchedule().Any(r => r.Renewal),
-                $"long rent ledger scrolls and includes generated renewal bills (content={rentScroll.GetVScrollBar().MaxValue}, viewport={rentScroll.Size.Y})");
-            Check(rentScroll.FindChildren("*", "Label", true, false).OfType<Label>().Any(label =>
-                label.Text.Contains("续租") && label.GetGlobalRect().Intersects(rentScroll.GetGlobalRect())),
-                "the ledger opens with upcoming renewal rows actually visible inside the scroll viewport");
-            await Capture(g, "09-renewal-ledger"); Press(g, "Back");
+            int endlessBalance = g.Session.Wallet;
+            for (int day = 11; day <= 13; day++)
+            {
+                Press(g, "EndDay"); Press(g, "ConfirmEnd");
+                Check(g.Session.Receipt!.Due == 0 && g.Session.Wallet == endlessBalance && g.Session.Phase == ShiftPhase.Shopping,
+                    "endless day closes without new rent or repeated victory");
+                if (day < 13) Press(g, "Next");
+            }
+            Check(g.Session.GetRentSchedule().All(r => r.Paid && !r.Renewal), "completed ledger contains no renewal obligations");
             await PresentationExtensionChecks.Run(g, Check);
             GD.Print($"VERIFICATION PASS: {_checks} checks; {totalFrames} simulated frames; wallet {g.Session.Wallet}.");
             g.GetTree().Quit(0);

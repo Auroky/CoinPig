@@ -26,21 +26,21 @@ public sealed class WorkshopRun
         _timing = factory.Timing;
         Hammer = new StrikeCycle(_timing);
         AutomaticAim = new AutomaticAim(_timing);
-        Session = factory.CreateSession(); Herd = factory.CreateHerd();
+        Session = factory.CreateSession(); Herd = factory.CreateHerd(Session.Shift);
     }
 
     public bool BeginShift()
     {
         if (!Session.BeginShift()) return false;
         Hammer = new StrikeCycle(Session.AttackTiming(_timing)); AutomaticAim.Reset();
-        _settleDelay = Session.CanAttack ? 0 : _timing.SettlementDelay; Herd = _factory.CreateHerd();
+        _settleDelay = Session.CanAttack ? 0 : _timing.SettlementDelay; Herd = _factory.CreateHerd(Session.Shift);
         _effects = Session.ActiveEffects.Select(e => e.Create() ?? throw new InvalidOperationException("Effect factories must return an instance.")).ToArray();
         EffectOutcomes = Array.Empty<EffectOutcome>();
         return true;
     }
     public void Restart()
     {
-        Session = _factory.CreateSession(); Herd = _factory.CreateHerd();
+        Session = _factory.CreateSession(); Herd = _factory.CreateHerd(Session.Shift);
         _effects = Array.Empty<ICombatEffect>(); EffectOutcomes = Array.Empty<EffectOutcome>();
         Hammer.Reset(); AutomaticAim.Reset(); _settleDelay = 0;
     }

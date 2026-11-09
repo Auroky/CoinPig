@@ -115,7 +115,10 @@ public partial class Workshop : Node2D
         Interface.Menu.Close();
         Interface.Hud.Show();
         Refresh();
-        Interface.Hud.Notify("开局准备 · 瞄准一只猪后自动挥锤，无需点击");
+        var arrivals = Content.Pigs.All.Where(pig => pig.FirstShift == Session.Shift && pig.FirstShift > 1).ToArray();
+        Interface.Hud.Notify(arrivals.Length > 0
+            ? string.Join(" · ", arrivals.Select(pig => $"{pig.Definition.Name}出现 · 耐久 {pig.Definition.MaxHealth}"))
+            : "开局准备 · 瞄准一只猪后自动挥锤，无需点击");
     }
     private void Restart()
     {

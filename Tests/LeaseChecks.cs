@@ -15,8 +15,8 @@ internal static class LeaseChecks
     { try { action(); return false; } catch (T) { return true; } }
     public static void Run(Action<bool, string> check)
     {
-        check(BalanceContent.Bills.Count == 15 && BalanceContent.Bills.Last().Shift == 30,
-            "default campaign contains thirty shifts and fifteen visible rent payments");
+        check(BalanceContent.Bills.SequenceEqual(new[] { new Bill(2, 28), new Bill(4, 56), new Bill(6, 84), new Bill(8, 128), new Bill(10, 156) }),
+            "default campaign collects rent every two shifts and ends with its fifth bill at shift ten");
         check(BalanceContent.Bills.Zip(BalanceContent.Bills.Skip(1), (a, b) => b.Shift == a.Shift + 2 && b.Amount > a.Amount).All(x => x),
             "campaign rents increase on a predictable two-day cycle");
         var maxBonus = EquipmentContent.Products.Single(p => p.Id == "Grinder").BonusThrough(3)
@@ -26,7 +26,7 @@ internal static class LeaseChecks
         check(BalanceContent.Tuning.StartingStamina + maxBonus.Stamina <= 31 && SkillContent.Nodes.Sum(s => s.Bonus.Stamina) == 3,
             "all equipment, skill and perk stamina stacks stay bounded while every endurance tier still contributes");
         check(EquipmentContent.Grinder.Attack.Stats(BalanceContent.Tuning, maxBonus).Radius <= 2.75f,
-            "even a fully stacked attack circle stays focused in the thirty-day campaign");
+            "even a fully stacked attack circle stays focused in the ten-day campaign");
         var growth = new CompoundingRent(2, 8, 20, 10);
         var next = growth.NextAfter(new(30, 900))!;
         check(next == new Bill(32, 980) && growth.NextAfter(next) == new Bill(34, 1060),

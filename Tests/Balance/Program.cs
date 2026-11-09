@@ -28,7 +28,7 @@ static class Program
 
     static PigRoster Roster(int population)
     {
-        if (population == 4) return PigContent.Roster;
+        if (population == PigContent.Roster.Spawns.Count) return PigContent.Roster;
         var normal = PigContent.Get("ceramic");
         var routes = new List<IMotionPath> { HerdLayout.Middle(1), HerdLayout.Middle(-1) };
         if (population >= 6) { routes.Add(HerdLayout.Back(-1)); routes.Add(HerdLayout.Front(1)); }
@@ -227,7 +227,7 @@ static class Program
         public SeededFactory(GameContent content, int seed) { _content = content; _seed = seed; }
         public SwingTiming Timing => _content.Timing;
         public GameSession CreateSession() => new(_content.Definition, new Random(_seed));
-        public PigHerd CreateHerd() => _content.CreateHerd();
+        public PigHerd CreateHerd(int shift = 1) => _content.CreateHerd(shift);
     }
 
     static void Main(string[] args)

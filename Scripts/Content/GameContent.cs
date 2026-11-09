@@ -14,7 +14,7 @@ public sealed class GameContent : IGameFactory
         _ = new StrikeCycle(Timing);
     }
     public GameSession CreateSession() => new(Definition);
-    public PigHerd CreateHerd() => new(Pigs.Spawns);
+    public PigHerd CreateHerd(int shift = 1) => new(Pigs.SpawnsForShift(shift));
 }
 
 public static class DefaultGame
@@ -35,7 +35,7 @@ public static class DefaultGame
         IRentContinuation? rentContinuation = null) =>
         new(tuning ?? BalanceContent.Tuning, bills ?? BalanceContent.Bills, products ?? EquipmentContent.Products,
             skills ?? SkillContent.Nodes, perks ?? PerkContent.Cards, rewardRules ?? RewardRules, startingWeapon ?? EquipmentContent.Hammer,
-            rentContinuation ?? (bills == null ? BalanceContent.Renewal : null));
+            rentContinuation);
 
     public static GameSession CreateSession(Random? random = null, IReadOnlyList<ShopProduct>? products = null,
         IReadOnlyList<SkillDefinition>? skills = null, IReadOnlyList<PerkCard>? perks = null) =>
