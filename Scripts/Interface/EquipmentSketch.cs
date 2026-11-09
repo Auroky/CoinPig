@@ -1,22 +1,13 @@
 using Godot;
-using System.Collections.Generic;
-
-public enum EquipmentAppearance { Hammer, Cuff }
 
 public partial class EquipmentSketch : Control
 {
-    private static readonly IReadOnlyDictionary<string, EquipmentAppearance> Appearances =
-        new Dictionary<string, EquipmentAppearance>
-        {
-            ["Rim"] = EquipmentAppearance.Hammer,
-            ["Stamina"] = EquipmentAppearance.Cuff
-        };
     public string ProductId { get; set; } = "";
     public override void _Draw()
     {
         var c = Size / 2;
         DrawArc(c, 85, 0, Mathf.Tau, 64, new Color(.7f, .6f, .4f, .17f), 1, true);
-        var appearance = Appearances.TryGetValue(ProductId, out var value) ? value : EquipmentAppearance.Hammer;
+        var appearance = EquipmentVisuals.For(ProductId);
         if (appearance == EquipmentAppearance.Hammer)
         {
             DrawLine(c + new Vector2(-10, -30), c + new Vector2(65, 65), new("62412c"), 24, true);

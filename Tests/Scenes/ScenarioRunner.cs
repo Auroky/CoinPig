@@ -16,7 +16,20 @@ internal static class ScenarioRunner
     }
     private static void MovePointer(Workshop g, Vector2 position)
     {
-        g.GetViewport().PushInput(new InputEventMouseMotion { Position = position, GlobalPosition = position }, true);
+        g.GetViewport().PushInput(new InputEventMouseMotion { Position = position, GlobalPosition = position, Relative = Vector2.One }, true);
+    }
+    private static async Task Click(Workshop game, string name)
+    {
+        await game.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+        var button = game.Interface.FindChildren(name, "Button", true, false).OfType<Button>().First(b => b.IsVisibleInTree());
+        Vector2 point = game.GetViewport().GetScreenTransform() * button.GetGlobalRect().GetCenter();
+        Input.ParseInputEvent(new InputEventMouseMotion { Position = point, GlobalPosition = point, Relative = Vector2.One });
+        Input.FlushBufferedEvents();
+        Input.ParseInputEvent(new InputEventMouseButton { Position = point, GlobalPosition = point, ButtonIndex = MouseButton.Left, Pressed = true });
+        Input.FlushBufferedEvents();
+        Input.ParseInputEvent(new InputEventMouseButton { Position = point, GlobalPosition = point, ButtonIndex = MouseButton.Left, Pressed = false });
+        Input.FlushBufferedEvents();
+        await game.ToSignal(game.GetTree(), SceneTree.SignalName.ProcessFrame);
     }
     private static void Tick(Workshop g, float seconds) { for (int i = 0; i < (int)Math.Ceiling(seconds / .05); i++) g._Process(.05); }
     private static async Task Capture(Workshop g, string name)
@@ -45,6 +58,21 @@ internal static class ScenarioRunner
             await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame);
             await Capture(g, "01-intro");
             Press(g, "Start"); Check(g.Session.Phase == ShiftPhase.Working && !g.Interface.Menu.IsOpen, "start button begins playable day");
+            foreach (var point in new[] { new System.Numerics.Vector2(-6, -3), new(0, 0), new(6, 3) })
+            {
+                Vector2 screen = g.Bench.ScreenPosition(point);
+                Check(g.Bench.TryWorldPosition(screen, out var recovered) && System.Numerics.Vector2.Distance(point, recovered) < .001f,
+                    "screen projection and tabletop picking agree in world coordinates");
+            }
+            string trace = ProjectionChecks.Run(g.Bench);
+            string[] arguments = OS.GetCmdlineUserArgs();
+            int directoryIndex = Array.IndexOf(arguments, "--capture-dir");
+            if (directoryIndex >= 0 && directoryIndex + 1 < arguments.Length)
+            {
+                Directory.CreateDirectory(arguments[directoryIndex + 1]);
+                File.WriteAllText(Path.Combine(arguments[directoryIndex + 1], "projection-trace.txt"), trace);
+            }
+            Check(true, "projected input matches direct world rules through seeded victory and bankruptcy");
             await Capture(g, "02-table");
             if (DisplayServer.GetName() != "headless")
             {
@@ -62,6 +90,8 @@ internal static class ScenarioRunner
                 Press(g, "Resume");
             }
             Check(g.Herd.Pigs.Count == 2 && g.Herd.Pigs.All(p => p.State.Definition.Id == "ceramic"), "starts with two ordinary pigs");
+            int arrivals = 0;
+            if (g.Bench is IRewardFeedback rewardFeedback) rewardFeedback.CoinCollected += () => arrivals++;
             int stamina = g.Session.Stamina;
             Tick(g, .8f);
             Check(g.Session.Stamina == stamina, "starting or resuming waits for pointer movement");
@@ -78,14 +108,31 @@ internal static class ScenarioRunner
             Press(g, "Resume");
             var target = g.Bench.ScreenPosition(g.Herd.Pigs[0]);
             var screenTarget = g.GetViewport().GetScreenTransform() * g.GetGlobalTransformWithCanvas() * target;
-            Input.ParseInputEvent(new InputEventMouseMotion { Position = screenTarget, GlobalPosition = screenTarget });
+            Input.ParseInputEvent(new InputEventMouseMotion { Position = screenTarget, GlobalPosition = screenTarget, Relative = Vector2.One });
             Input.FlushBufferedEvents();
             Tick(g, .25f);
             Check(g.Session.Stamina == stamina - 1 && g.Session.ShiftPigs >= 1, "mouse movement alone lands a hit without a button press");
+            if (g.Bench is TabletopView)
+            {
+                var camera = g.GetViewport().GetCamera3D();
+                Check(Mathf.Abs(camera.HOffset) + Mathf.Abs(camera.VOffset) > .00001f, "successful contact produces a short camera impulse");
+                var world = g.Herd.Pigs[0].Position;
+                Check(g.Bench.TryWorldPosition(g.Bench.ScreenPosition(world), out var recovered) && System.Numerics.Vector2.Distance(world, recovered) < .001f,
+                    "camera impulse does not displace the logical aim point");
+            }
+            await Capture(g, "12-impact");
             Tick(g, .6f);
             Check(g.Session.Stamina == stamina - 2, "stationary pointer continues at the recovery cadence");
-            MovePointer(g, new(-100, -100)); Tick(g, .8f);
+            int earnedBalance = g.Session.Wallet;
+            MovePointer(g, new(-100, -100)); Tick(g, 1.1f);
             Check(g.Session.Stamina == stamina - 2, "leaving the table stops new automatic swings");
+            if (g.Bench is TabletopView table)
+            {
+                Check(arrivals > 0 && g.Session.Wallet == earnedBalance, "coin arrivals animate the wallet without granting currency again");
+                Check(table.GetNode<ImpactBurst>("ImpactEffects").ActiveCount == 0, "impact debris and pulses are removed after their lifetime");
+                var camera = g.GetViewport().GetCamera3D();
+                Check(camera.HOffset == 0 && camera.VOffset == 0, "camera returns to its neutral projection");
+            }
             Press(g, "EndDay"); Press(g, "ConfirmEnd");
             Check(g.Session.Phase == ShiftPhase.Shopping, "early end reaches settlement");
             await Capture(g, "03-settlement");
@@ -100,8 +147,14 @@ internal static class ScenarioRunner
             Check(g.Session.Wallet == originalCash, "replacing display providers cannot spend session money");
             Press(g, "Back");
             Press(g, "Equipment"); int wallet = g.Session.Wallet;
-            Press(g, "Buy_Rim"); Check(g.Session.Wallet == wallet && g.Interface.Menu.NoticeText.Contains("余额不足"), "unaffordable shop action is visible and non-destructive");
+            if (DisplayServer.GetName() == "headless") Press(g, "Buy_Rim"); else await Click(g, "Buy_Rim");
+            Check(g.Session.Wallet == wallet && g.Interface.Menu.NoticeText.Contains("余额不足"), "physical catalogue click is routed correctly and failed purchases preserve balance");
             await Capture(g, "04-shop");
+            if (g.SpatialCatalogs)
+            {
+                Press(g, "ViewRent"); Press(g, "Back");
+                Check(g.Interface.Menu.Page == MenuPage.Equipment && g.Session.Phase == ShiftPhase.Shopping, "rent opened from the gallery returns to the gallery");
+            }
             Press(g, "Back"); Press(g, "Skills");
             Press(g, "Learn_power2"); Check(g.Session.Damage == 1 && g.Session.Wallet == wallet, "locked skill cannot be purchased through UI");
             await Capture(g, "05-skills");
@@ -145,16 +198,16 @@ internal static class ScenarioRunner
                     Press(g, "Next"); await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame); continue;
                 }
                 var visible = g.Herd.Pigs.Where(p => p.Active).ToArray();
-                Vector2 bestPoint = new(466, 406); float bestScore = -1;
-                var candidates = visible.Select(g.Bench.ScreenPosition).Concat(visible.SelectMany(a => visible.Select(b => (g.Bench.ScreenPosition(a) + g.Bench.ScreenPosition(b)) / 2)));
+                System.Numerics.Vector2 bestPoint = default; float bestScore = -1;
+                var candidates = visible.Select(p => p.Position).Concat(visible.SelectMany(a => visible.Select(b => (a.Position + b.Position) / 2)));
                 foreach (var point in candidates)
                 {
                     // Allow room for the pigs to keep moving during the windup.
-                    var hits = visible.Where(p => g.Bench.ScreenPosition(p).DistanceTo(point) <= (g.Bench.Radius - .4f) * g.Bench.UnitScale).Select(p => p.State);
+                    var hits = visible.Where(p => System.Numerics.Vector2.Distance(p.Position, point) <= g.Bench.Radius - .4f).Select(p => p.State);
                     float score = hits.Sum(p => p.Definition.Coins / (float)Math.Ceiling(p.Health / (float)g.Session.Damage));
                     if (score > bestScore) { bestScore = score; bestPoint = point; }
                 }
-                MovePointer(g, bestScore >= 4 ? bestPoint : new Vector2(-100, -100));
+                MovePointer(g, bestScore >= 4 ? g.Bench.ScreenPosition(bestPoint) : new Vector2(-100, -100));
                 g._Process(.05); totalFrames++;
             }
             Check(g.Session.Phase == ShiftPhase.Won && g.Session.PaidBills == 5, "normal aiming bot completes ten-day contract");
