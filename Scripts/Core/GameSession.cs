@@ -1,23 +1,23 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 public enum ShiftPhase { Ready, Working, Choosing, Shopping, Won, Bankrupt }
 public sealed record ShiftReceipt(int Shift, int OpeningCash, int Earnings, int Due, int Paid, int Shortfall, int Pigs);
 
-/// <summary>一局的体力、钱包与还款顺序。场景负责提供每次落锤的伤害结果，界面只读取结算结果。</summary>
+/// <summary>协调一局的回合、体力和钱包；合法命令交给伤害、账单和成长对象处理。</summary>
 public sealed class GameSession : IShop, ISkillTree
 {
-    private readonly Random _random;
-    private readonly HashSet<Perk> _perks = new();
+    private readonly PerkProgress _perks;
     private readonly SwingRewards _rewards = new();
     private readonly RentContract _contract = new(GameRules.Bills);
-    private readonly SkillProgress _skills = new();
+    private readonly SkillProgress _skills;
     private readonly ShopInventory _inventory;
 
-    public GameSession(Random? random = null, IReadOnlyList<ShopProduct>? products = null)
+    public GameSession(Random? random = null, IReadOnlyList<ShopProduct>? products = null,
+        IReadOnlyList<SkillDefinition>? skills = null, IReadOnlyList<PerkCard>? perks = null)
     {
-        _random = random ?? new Random();
+        _perks = new PerkProgress(perks ?? GameRules.Cards, random ?? new Random());
+        _skills = new SkillProgress(skills ?? SkillCatalog.Nodes);
         _inventory = new ShopInventory(products ?? ShopCatalog.Products);
     }
 
@@ -31,13 +31,13 @@ public sealed class GameSession : IShop, ISkillTree
     public int ShiftPigs { get; private set; }
     public float RecoveryReduction => _skills.TotalBonus.Recovery;
     public int PaidBills => _contract.PaidCount;
-    public int Capacity => GameRules.StartingStamina + _inventory.TotalBonus.Stamina + _skills.TotalBonus.Stamina + (Has(Perk.Lunch) ? GameRules.LunchStamina : 0);
-    public float ExtraRadius => _inventory.TotalBonus.Radius + _skills.TotalBonus.Radius + (Has(Perk.WideRim) ? GameRules.PerkRimGain : 0);
+    public int Capacity => GameRules.StartingStamina + _inventory.TotalBonus.Stamina + _skills.TotalBonus.Stamina + _perks.TotalBonus.Stamina;
+    public float ExtraRadius => _inventory.TotalBonus.Radius + _skills.TotalBonus.Radius + _perks.TotalBonus.Radius;
     public Bill? NextBill => _contract.Next;
     public ShiftReceipt? Receipt { get; private set; }
-    public IReadOnlyList<PerkCard> Offers { get; private set; } = Array.Empty<PerkCard>();
+    public IReadOnlyList<PerkCard> Offers => _perks.Offers;
 
-    public bool Has(Perk perk) => _perks.Contains(perk);
+    public bool Has(Perk perk) => _perks.Has(perk);
 
     public IReadOnlyList<RentDue> GetRentSchedule() => _contract.Schedule(Shift, Phase == ShiftPhase.Bankrupt);
 
@@ -54,7 +54,7 @@ public sealed class GameSession : IShop, ISkillTree
         return true;
     }
 
-    public int LandSwing(SwingResult strike)
+    private int SettleSwing(SwingResult strike)
     {
         if (strike.IsSettled) return 0;
         if (Phase != ShiftPhase.Working || Stamina == 0)
@@ -64,7 +64,7 @@ public sealed class GameSession : IShop, ISkillTree
         Stamina--;
         int broken = strike.DestroyedCount;
         ShiftPigs += broken;
-        var payout = _rewards.Calculate(strike, _skills.TotalBonus, Has);
+        var payout = _rewards.Calculate(strike, _skills.TotalBonus, _perks.TotalBonus);
         int coins = payout.Coins;
         Stamina += payout.StaminaRefund;
         Wallet += coins;
@@ -79,7 +79,7 @@ public sealed class GameSession : IShop, ISkillTree
         coins = 0;
         if (Phase != ShiftPhase.Working || Stamina <= 0) return false;
         strike = StrikeResolver.Resolve(targets, Damage);
-        coins = LandSwing(strike);
+        coins = SettleSwing(strike);
         return true;
     }
 
@@ -96,16 +96,13 @@ public sealed class GameSession : IShop, ISkillTree
         if (due == 0) { Phase = ShiftPhase.Shopping; return; }
 
         if (NextBill == null) { Phase = ShiftPhase.Won; return; }
-        Offers = GameRules.Cards.Where(card => !Has(card.Kind))
-            .OrderBy(_ => _random.Next()).Take(3).ToArray();
+        _perks.OfferChoices();
         Phase = Offers.Count > 0 ? ShiftPhase.Choosing : ShiftPhase.Shopping;
     }
 
     public bool Choose(Perk kind)
     {
-        if (Phase != ShiftPhase.Choosing || !Offers.Any(card => card.Kind == kind)) return false;
-        _perks.Add(kind);
-        Offers = Array.Empty<PerkCard>();
+        if (Phase != ShiftPhase.Choosing || !_perks.Choose(kind)) return false;
         Phase = ShiftPhase.Shopping;
         return true;
     }

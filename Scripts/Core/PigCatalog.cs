@@ -5,7 +5,7 @@ using System.Linq;
 public sealed record PigDefinition(string Id, string Name, float Speed, int MaxHealth,
     int Coins, string ShortName = "");
 
-/// <summary>猪种数据。速度、耐久、奖励与外观在同一处配置，伤害与结算共享通用规则。</summary>
+/// <summary>猪种的速度、耐久和奖励配置。外观由表现层管理。</summary>
 public static class PigCatalog
 {
     public static IReadOnlyList<PigDefinition> All { get; } = Array.AsReadOnly(new PigDefinition[]

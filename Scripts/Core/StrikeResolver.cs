@@ -14,7 +14,7 @@ public sealed class SwingResult
 
     internal SwingResult(IReadOnlyList<PigDamage> targets)
     {
-        Targets = targets;
+        Targets = Array.AsReadOnly(targets.ToArray());
         HitCount = targets.Count;
         var destroyed = targets.Where(target => target.Result.Destroyed).ToArray();
         DestroyedCount = destroyed.Length;
@@ -29,9 +29,15 @@ public static class StrikeResolver
 {
     public static SwingResult Resolve(IEnumerable<PigState> targets, int damage)
     {
+        ArgumentNullException.ThrowIfNull(targets);
         if (damage <= 0) throw new ArgumentOutOfRangeException(nameof(damage));
+        var uniqueTargets = targets.Distinct().ToArray();
+        if (uniqueTargets.Any(pig => pig == null))
+            throw new ArgumentException("Targets cannot contain a null pig.", nameof(targets));
+        // Enumerate and validate the complete command before changing any health.
+        _ = uniqueTargets.Where(pig => pig.IsAlive && pig.Health <= damage).Sum(pig => pig.Definition.Coins);
         var results = new List<PigDamage>();
-        foreach (var pig in targets.Distinct())
+        foreach (var pig in uniqueTargets)
         {
             var result = pig.ApplyDamage(damage);
             if (result.WasHit) results.Add(new PigDamage(pig, result));

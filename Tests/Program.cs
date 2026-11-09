@@ -21,7 +21,7 @@ static class Program
         Check(run.BeginShift() && !run.BeginShift(), "begin is not repeatable during work");
         Check(run.TrySwing(new[] { tin, tin }, out var first, out int coins) && tin.Health == 2 && coins == 0 && run.Stamina == 11, "one damage and one stamina for duplicate targets");
         int stamina = run.Stamina;
-        Check(run.LandSwing(first!) == 0 && run.Stamina == stamina, "settled swing cannot reward twice");
+        Check(first!.IsSettled && typeof(GameSession).GetMethod("LandSwing") == null, "settlement is completed internally and has no public replay entry");
         run.TrySwing(new[] { tin }, out _, out _); run.TrySwing(new[] { tin }, out _, out coins);
         Check(!tin.IsAlive && coins == 6 && run.Wallet == 6, "tin pays only at destruction");
         run.TrySwing(new[] { tin }, out _, out coins);
@@ -69,7 +69,7 @@ static class Program
         Check(contract.Settle(2, 9).Shortfall == 1 && contract.PaidCount == 0, "failed rent preserves outstanding bill");
         Check(contract.Settle(2, 10).Paid == 10 && contract.PaidCount == 1, "exact rent advances bill");
         Check(contract.Settle(2, 100).Paid == 0 && contract.PaidCount == 1, "same bill cannot be collected twice");
-        var herd = new PigHerd();
+        var herd = new PigHerd(HerdLayout.Initial);
         Check(herd.Pigs.Count == 2 && herd.Pigs.All(p => p.State.Definition.Id == "ceramic"), "default herd contains exactly two ordinary pigs");
         var at = herd.Pigs[0].Position;
         herd.Advance(.2f);
@@ -86,6 +86,7 @@ static class Program
         IShop shop = configured;
         Check(shop.GetOffers().Count == 1 && shop.GetOffers()[0].Product.Id == "gloves", "shop lists injected catalogue through interface");
         Check(shop.TryBuy("gloves", 0).Succeeded && configured.Capacity == 15, "new data variant uses unchanged purchase workflow");
+        ArchitectureChecks.Run(Check);
         Console.WriteLine($"PASS: {_checks} core checks. No Godot runtime required.");
     }
 }

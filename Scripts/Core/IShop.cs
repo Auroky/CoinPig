@@ -9,12 +9,19 @@ public sealed record PurchaseResult(PurchaseStatus Status, int CashSpent = 0)
 }
 
 /// <summary>
-/// 界面只读取报价和提交购买。正常购买失败返回结果，并保持钱包与等级原值。
-/// expectedLevel 是玩家看到的商品等级，防止重复提交同一报价时重复扣款。
+/// 商品显示只需要余额和报价，不获得购买命令。
 /// </summary>
-public interface IShop
+public interface IShopView
 {
     int Wallet { get; }
     IReadOnlyList<ShopOffer> GetOffers();
+}
+
+/// <summary>
+/// 购买成功扣除当前报价；失败保持余额与等级不变。
+/// expectedLevel 为玩家看到的商品等级，过期报价不能重复扣款。
+/// </summary>
+public interface IShop : IShopView
+{
     PurchaseResult TryBuy(string productId, int expectedLevel);
 }

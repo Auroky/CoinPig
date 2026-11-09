@@ -137,7 +137,7 @@ public partial class WorkshopMenu : Control
         row.AddChild(Label(value, size));
     }
 
-    public void ShowEquipment(IShop shop, SessionSnapshot state)
+    public void ShowEquipment(IShopView shop, SessionSnapshot state)
     {
         var body = Open(MenuPage.Equipment, "装备", $"余额 ¥{shop.Wallet}", new(1000, 650), () => ShowReceipt(state));
         Rule(body);
@@ -146,7 +146,7 @@ public partial class WorkshopMenu : Control
         {
             var column = Column(row, 18);
             column.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-            var illustration = new EquipmentSketch { Kind = offer.Product.Appearance, CustomMinimumSize = new(0, 235), MouseFilter = MouseFilterEnum.Ignore };
+            var illustration = new EquipmentSketch { ProductId = offer.Product.Id, CustomMinimumSize = new(0, 235), MouseFilter = MouseFilterEnum.Ignore };
             column.AddChild(illustration);
             column.AddChild(Label(offer.Product.Name, 27));
             column.AddChild(Label($"等级 {offer.Level} / {offer.Product.MaxLevel}", 17, Muted));
@@ -158,19 +158,20 @@ public partial class WorkshopMenu : Control
         Back(body, () => ShowReceipt(state), "返回结算");
     }
 
-    public void ShowSkills(ISkillTree skills, SessionSnapshot state)
+    public void ShowSkills(ISkillTreeView skills, SessionSnapshot state)
     {
         var body = Open(MenuPage.Skills, "技能", $"余额 ¥{state.Wallet}", new(1280, 710), () => ShowReceipt(state));
         Rule(body);
         var columns = Row(body, 22);
         var offers = skills.GetSkills();
-        foreach (var branch in Enum.GetValues<SkillBranch>())
+        foreach (var group in offers.GroupBy(offer => offer.Skill.Branch).OrderBy(group => group.Key))
         {
+            var branch = group.Key;
             var column = Column(columns, 14);
             column.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-            string name = branch switch { SkillBranch.Hammer => "锤法", SkillBranch.Stamina => "耐力", SkillBranch.Income => "收益", _ => "重击" };
+            string name = branch switch { SkillBranch.Hammer => "锤法", SkillBranch.Stamina => "耐力", SkillBranch.Income => "收益", SkillBranch.Heavy => "重击", _ => branch.ToString() };
             column.AddChild(Label(name, 24, Brass));
-            foreach (var offer in offers.Where(item => item.Skill.Branch == branch))
+            foreach (var offer in group)
             {
                 var skill = offer.Skill;
                 var panel = new PanelContainer { CustomMinimumSize = new(0, 150) };

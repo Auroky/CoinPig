@@ -5,7 +5,7 @@ public enum Perk { PairBonus, SecondWind, CoinValue, Lunch, Precision, WideRim }
 
 public sealed record Bill(int Shift, int Amount);
 public sealed record RentDue(int Day, int Amount, bool Paid, int DaysAway, bool Failed);
-public sealed record PerkCard(Perk Kind, string Name, string Description);
+public sealed record PerkCard(Perk Kind, string Name, string Description, PerkBonus Bonus);
 
 public static class GameRules
 {
@@ -24,12 +24,12 @@ public static class GameRules
     public static int ContractLength => Bills[^1].Shift;
     public static IReadOnlyList<PerkCard> Cards { get; } = Array.AsReadOnly(new PerkCard[]
     {
-        new(Perk.PairBonus, "双响赏金", $"一锤击碎至少两只，额外赚 ¥{PairBonusCoins}。"),
-        new(Perk.SecondWind, "借力回弹", $"每局前 {SecondWindRefunds} 次一锤多碎，各返还 1 点体力。"),
-        new(Perk.CoinValue, "黄铜内胆", $"每局前 {CoinValueLimit} 只击碎的猪各额外掉落 ¥1。"),
-        new(Perk.Lunch, "工间加餐", $"从下一局开始，每局多 {LunchStamina} 点体力。"),
-        new(Perk.Precision, "单响奖", $"一锤恰好击碎一只，额外赚 ¥{PrecisionBonusCoins}。"),
-        new(Perk.WideRim, "宽边锤套", $"落锤半径增加 {PerkRimGain:0.00}，圈边更容易够到猪。")
+        new(Perk.PairBonus, "双响赏金", $"一锤击碎至少两只，额外赚 ¥{PairBonusCoins}。", new(PairCoins: PairBonusCoins)),
+        new(Perk.SecondWind, "借力回弹", $"每局前 {SecondWindRefunds} 次一锤多碎，各返还 1 点体力。", new(Refunds: SecondWindRefunds)),
+        new(Perk.CoinValue, "黄铜内胆", $"每局前 {CoinValueLimit} 只击碎的猪各额外掉落 ¥1。", new(BonusCoinLimit: CoinValueLimit)),
+        new(Perk.Lunch, "工间加餐", $"从下一局开始，每局多 {LunchStamina} 点体力。", new(Stamina: LunchStamina)),
+        new(Perk.Precision, "单响奖", $"一锤恰好击碎一只，额外赚 ¥{PrecisionBonusCoins}。", new(SingleCoins: PrecisionBonusCoins)),
+        new(Perk.WideRim, "宽边锤套", $"落锤半径增加 {PerkRimGain:0.00}，圈边更容易够到猪。", new(Radius: PerkRimGain))
     });
 }
 

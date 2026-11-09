@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -11,7 +12,23 @@ public sealed class ShopInventory
 
     public ShopInventory(IReadOnlyList<ShopProduct> catalog)
     {
-        _catalog = catalog;
+        ArgumentNullException.ThrowIfNull(catalog);
+        var snapshot = catalog.ToArray();
+        if (snapshot.Any(product => product == null || string.IsNullOrWhiteSpace(product.Id) ||
+            product.BasePrice < 0 || product.PriceStep < 0 || product.MaxLevel <= 0 ||
+            product.Bonus == null || product.Bonus.Stamina < 0 ||
+            !float.IsFinite(product.Bonus.Radius) || product.Bonus.Radius < 0) ||
+            snapshot.Select(product => product.Id).Distinct().Count() != snapshot.Length)
+            throw new ArgumentException("Products need unique IDs, valid prices and nonnegative finite bonuses.", nameof(catalog));
+        try
+        {
+            foreach (var product in snapshot) _ = product.PriceAt(product.MaxLevel);
+        }
+        catch (OverflowException exception)
+        {
+            throw new ArgumentException("Product prices exceed the supported range.", nameof(catalog), exception);
+        }
+        _catalog = Array.AsReadOnly(snapshot);
     }
 
     public ShopProduct? Find(string id) => _catalog.FirstOrDefault(product => product.Id == id);
@@ -37,8 +54,9 @@ public sealed class ShopInventory
         var status = Availability(product, wallet, open);
         if (status != PurchaseStatus.Available) return new(status);
         int price = product.PriceAt(expectedLevel);
+        var updated = TotalBonus.Add(product.Bonus);
         _levels[product.Id] = Level(product.Id) + 1;
-        TotalBonus = TotalBonus.Add(product.Bonus);
+        TotalBonus = updated;
         return new(PurchaseStatus.Purchased, price);
     }
 }

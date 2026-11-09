@@ -14,7 +14,7 @@ public sealed class RentContract
     public RentContract(IReadOnlyList<Bill> bills)
     {
         ArgumentNullException.ThrowIfNull(bills);
-        if (bills.Any(bill => bill.Shift <= 0 || bill.Amount < 0) ||
+        if (bills.Any(bill => bill == null || bill.Shift <= 0 || bill.Amount < 0) ||
             bills.Zip(bills.Skip(1), (a, b) => a.Shift >= b.Shift).Any(invalid => invalid))
             throw new ArgumentException("Bills must have increasing positive days and nonnegative amounts.", nameof(bills));
         _bills = Array.AsReadOnly(bills.ToArray());
@@ -22,6 +22,8 @@ public sealed class RentContract
 
     public RentPayment Settle(int day, int balance)
     {
+        if (day <= 0) throw new ArgumentOutOfRangeException(nameof(day));
+        if (balance < 0) throw new ArgumentOutOfRangeException(nameof(balance));
         int due = Next is Bill bill && bill.Shift <= day ? bill.Amount : 0;
         int shortfall = Math.Max(0, due - balance);
         if (Next is Bill next && next.Shift <= day && shortfall == 0)

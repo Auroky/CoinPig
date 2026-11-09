@@ -1,11 +1,12 @@
 using Godot;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
 /// <summary>Maps world-space pigs to the workbench and draws the aiming tool.</summary>
 public partial class WorkbenchView : Node2D
 {
-    public PigHerd Herd { get; private set; } = new();
+    private IReadOnlyList<PigMotion> _pigs = Array.Empty<PigMotion>();
     public Vector2 Aim { get; set; }
     public bool ShowPigs { get; set; } = true;
     private bool _showAim;
@@ -32,12 +33,11 @@ public partial class WorkbenchView : Node2D
         AddChild(new WorkbenchBackdrop());
         _effects = new StrikeEffects();
         AddChild(_effects);
-        ResetPigs();
     }
 
-    public void ResetPigs()
+    public void Bind(IReadOnlyList<PigMotion> pigs)
     {
-        Herd = new PigHerd();
+        _pigs = pigs;
         _flashes.Clear();
         _effects.Clear();
         Windup = Cooldown = 0;
@@ -45,16 +45,14 @@ public partial class WorkbenchView : Node2D
     }
 
     public Vector2 ScreenPosition(PigMotion pig) => Origin + new Vector2(pig.Position.X, pig.Position.Y) * UnitScale;
-    public PigState[] TargetsAt(Vector2 screenPoint)
+    public System.Numerics.Vector2 WorldPosition(Vector2 screenPoint)
     {
         Vector2 local = (screenPoint - Origin) / UnitScale;
-        return Herd.Targets(new System.Numerics.Vector2(local.X, local.Y), Radius);
+        return new(local.X, local.Y);
     }
 
-    public void Tick(float delta, bool active)
+    public void Tick(float delta)
     {
-        if (!active) return;
-        Herd.Advance(delta);
         foreach (var key in _flashes.Keys.ToArray()) _flashes[key] = Mathf.Max(0, _flashes[key] - delta);
         _effects.Tick(delta);
         QueueRedraw();
@@ -65,17 +63,16 @@ public partial class WorkbenchView : Node2D
         foreach (var hit in strike.Targets)
         {
             _flashes[hit.Pig] = .22f;
-            var pig = Herd.Pigs.First(p => ReferenceEquals(p.State, hit.Pig));
+            var pig = _pigs.First(p => ReferenceEquals(p.State, hit.Pig));
             if (hit.Result.Destroyed) _effects.Break(ScreenPosition(pig), PigPainter.Look(hit.Pig.Definition.Id).Body);
         }
-        Herd.Apply(strike);
         _effects.Strike(point, Radius * UnitScale, strike.DestroyedCount, strike.HitCount, coins);
     }
 
     public override void _Draw()
     {
         if (ShowPigs)
-            foreach (var pig in Herd.Pigs.OrderBy(pig => pig.Position.Y))
+            foreach (var pig in _pigs.OrderBy(pig => pig.Position.Y))
                 if (pig.Active) PigPainter.Draw(this, pig, ScreenPosition(pig), UnitScale / 55, _flashes.GetValueOrDefault(pig.State));
         if (!ShowAim || !PlayArea.HasPoint(Aim)) return;
         float radius = Radius * UnitScale;

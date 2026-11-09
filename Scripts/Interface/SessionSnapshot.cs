@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-/// <summary>Immutable information consumed by the HUD and day-end screens.</summary>
+/// <summary>Read-only display data consumed by the HUD and day-end screens.</summary>
 public sealed record SessionSnapshot(
     ShiftPhase Phase, int Day, int Wallet, int Stamina, int Capacity, int Earnings,
     int Pigs, int Damage, float Radius, bool Endless, Bill? NextBill, ShiftReceipt? Receipt,

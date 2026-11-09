@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 
-public enum PigLane { Middle, Back, Front, Side }
-public sealed record PigSpawn(PigLane Lane, float Side, string Species);
-
 /// <summary>A pig's world-space movement and respawn lifecycle.</summary>
 public sealed class PigMotion
 {
@@ -13,43 +10,40 @@ public sealed class PigMotion
     public Vector2 Position { get; private set; }
     public float Time { get; private set; }
     public bool Active => State.IsAlive && _respawnIn <= 0;
-    private readonly PigSpawn _spawn;
+    private readonly IMotionPath _path;
     private float _respawnIn;
 
     public PigMotion(PigSpawn spawn)
     {
-        _spawn = spawn;
-        State = new PigState(PigCatalog.Get(spawn.Species));
-        Position = PositionAt(0);
+        ArgumentNullException.ThrowIfNull(spawn);
+        ArgumentNullException.ThrowIfNull(spawn.Path);
+        _path = spawn.Path;
+        State = new PigState(spawn.Definition);
+        Position = _path.Sample(0);
+        if (!float.IsFinite(Position.X) || !float.IsFinite(Position.Y))
+            throw new ArgumentException("Motion paths must return a finite starting position.", nameof(spawn));
     }
 
     public void Advance(float delta)
     {
-        if (delta < 0) throw new ArgumentOutOfRangeException(nameof(delta));
-        Time += delta * State.Definition.Speed;
+        if (!float.IsFinite(delta) || delta < 0) throw new ArgumentOutOfRangeException(nameof(delta));
+        float nextTime = Time + delta * State.Definition.Speed;
+        if (!float.IsFinite(nextTime)) throw new ArgumentOutOfRangeException(nameof(delta));
+        var nextPosition = _path.Sample(nextTime);
+        if (!float.IsFinite(nextPosition.X) || !float.IsFinite(nextPosition.Y))
+            throw new InvalidOperationException("Motion paths must return finite positions.");
+        Time = nextTime;
         if (_respawnIn > 0)
         {
             _respawnIn -= delta;
             if (_respawnIn <= 0) State.Respawn();
         }
-        Position = PositionAt(Time);
+        Position = nextPosition;
     }
 
-    public void Receive(DamageResult hit)
+    internal void Receive(DamageResult hit)
     {
-        if (hit.Destroyed) _respawnIn = .85f;
-    }
-
-    private Vector2 PositionAt(float time)
-    {
-        float side = _spawn.Side;
-        return _spawn.Lane switch
-        {
-            PigLane.Middle => new(side * 5.72f * MathF.Cos(time * .54f + (side < 0 ? .055f : 0)), side * (.64f + .14f * MathF.Sin(time * 1.08f))),
-            PigLane.Back => new(.5f + side * 5.73f * MathF.Sin(time * .42f + .72f), -2.2f + side * .67f * MathF.Cos(time * .42f + .72f)),
-            PigLane.Front => new(-.35f + side * 5.82f * MathF.Sin(time * .45f - .62f), 2.57f + side * .63f * MathF.Cos(time * .45f - .62f)),
-            _ => new(side * (4.12f + 1.44f * MathF.Cos(time * .69f + .35f)), side * 2.9f * MathF.Sin(time * .69f + .35f))
-        };
+        if (hit.Destroyed && !State.IsAlive && _respawnIn <= 0) _respawnIn = .85f;
     }
 }
 
@@ -58,13 +52,9 @@ public sealed class PigHerd
     private readonly IReadOnlyList<PigMotion> _pigs;
     public IReadOnlyList<PigMotion> Pigs => _pigs;
 
-    public PigHerd(IEnumerable<PigSpawn>? spawns = null)
+    public PigHerd(IEnumerable<PigSpawn> spawns)
     {
-        spawns ??= new[]
-        {
-            new PigSpawn(PigLane.Middle, 1, "ceramic"),
-            new(PigLane.Middle, -1, "ceramic")
-        };
+        ArgumentNullException.ThrowIfNull(spawns);
         _pigs = Array.AsReadOnly(spawns.Select(spawn => new PigMotion(spawn)).ToArray());
     }
 
@@ -73,9 +63,13 @@ public sealed class PigHerd
         foreach (var pig in _pigs) pig.Advance(delta);
     }
 
-    public PigState[] Targets(Vector2 point, float radius) => _pigs
-        .Where(pig => pig.Active && Vector2.Distance(pig.Position, point) <= radius + .33f)
-        .Select(pig => pig.State).ToArray();
+    public PigState[] Targets(Vector2 point, float radius)
+    {
+        if (!float.IsFinite(point.X) || !float.IsFinite(point.Y) || !float.IsFinite(radius) || radius < 0)
+            throw new ArgumentOutOfRangeException(nameof(radius));
+        return _pigs.Where(pig => pig.Active && Vector2.Distance(pig.Position, point) <= radius + .33f)
+            .Select(pig => pig.State).ToArray();
+    }
 
     public void Apply(SwingResult strike)
     {

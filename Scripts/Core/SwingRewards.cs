@@ -14,24 +14,24 @@ public sealed class SwingRewards
         _bonusKills = 0;
     }
 
-    public SwingPayout Calculate(SwingResult strike, SkillBonus skills, Func<Perk, bool> owns)
+    public SwingPayout Calculate(SwingResult strike, SkillBonus skills, PerkBonus perks)
     {
         int broken = strike.DestroyedCount;
         int coins = strike.BaseCoins + broken * skills.PigCoins;
         int refund = 0;
-        if (owns(Perk.CoinValue))
+        if (perks.BonusCoinLimit > 0)
         {
-            int rewarded = Math.Min(broken, GameRules.CoinValueLimit - _bonusKills);
+            int rewarded = Math.Min(broken, Math.Max(0, perks.BonusCoinLimit - _bonusKills));
             coins += rewarded;
             _bonusKills += rewarded;
         }
         if (broken >= 3) coins += skills.TripleCoins;
-        if (broken == 1 && owns(Perk.Precision)) coins += GameRules.PrecisionBonusCoins;
+        if (broken == 1) coins += perks.SingleCoins;
         if (broken >= 2)
         {
             coins += skills.PairCoins;
-            if (owns(Perk.PairBonus)) coins += GameRules.PairBonusCoins;
-            int limit = skills.Refunds + (owns(Perk.SecondWind) ? GameRules.SecondWindRefunds : 0);
+            coins += perks.PairCoins;
+            int limit = skills.Refunds + perks.Refunds;
             if (_refunds < limit)
             {
                 _refunds++;

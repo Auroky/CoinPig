@@ -61,22 +61,22 @@ internal static class ScenarioRunner
                 Check(g.GetWindow().Mode == Window.ModeEnum.Fullscreen, "F11 restores fullscreen");
                 Press(g, "Resume");
             }
-            Check(g.Bench.Herd.Pigs.Count == 2 && g.Bench.Herd.Pigs.All(p => p.State.Definition.Id == "ceramic"), "starts with two ordinary pigs");
+            Check(g.Herd.Pigs.Count == 2 && g.Herd.Pigs.All(p => p.State.Definition.Id == "ceramic"), "starts with two ordinary pigs");
             int stamina = g.Session.Stamina;
             Tick(g, .8f);
             Check(g.Session.Stamina == stamina, "starting or resuming waits for pointer movement");
             MovePointer(g, new(-100, -100)); Tick(g, .8f);
             Check(g.Session.Stamina == stamina, "outside pointer does not spend stamina");
             Press(g, "Pause");
-            MovePointer(g, g.Bench.ScreenPosition(g.Bench.Herd.Pigs[0]));
-            var position = g.Bench.Herd.Pigs[0].Position; Tick(g, 1);
-            Check(g.Session.Stamina == stamina && g.Bench.Herd.Pigs[0].Position == position, "pause freezes automatic swings and actors");
+            MovePointer(g, g.Bench.ScreenPosition(g.Herd.Pigs[0]));
+            var position = g.Herd.Pigs[0].Position; Tick(g, 1);
+            Check(g.Session.Stamina == stamina && g.Herd.Pigs[0].Position == position, "pause freezes automatic swings and actors");
             Press(g, "Help");
             Input.ParseInputEvent(new InputEventKey { Keycode = Key.Escape, Pressed = true });
             await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame);
             Check(g.Interface.Menu.Page == MenuPage.Pause, "help returns to pause without checking text");
             Press(g, "Resume");
-            var target = g.Bench.ScreenPosition(g.Bench.Herd.Pigs[0]);
+            var target = g.Bench.ScreenPosition(g.Herd.Pigs[0]);
             var screenTarget = g.GetViewport().GetScreenTransform() * g.GetGlobalTransformWithCanvas() * target;
             Input.ParseInputEvent(new InputEventMouseMotion { Position = screenTarget, GlobalPosition = screenTarget });
             Input.FlushBufferedEvents();
@@ -89,6 +89,16 @@ internal static class ScenarioRunner
             Press(g, "EndDay"); Press(g, "ConfirmEnd");
             Check(g.Session.Phase == ShiftPhase.Shopping, "early end reaches settlement");
             await Capture(g, "03-settlement");
+            var snapshot = SessionSnapshot.From(g.Session);
+            int originalCash = g.Session.Wallet;
+            g.Interface.Menu.ShowEquipment(new ReadOnlyStock(), snapshot);
+            Check(g.Interface.FindChildren("Buy_spare", "Button", true, false).OfType<Button>().Any(b => b.IsVisibleInTree()),
+                "equipment display accepts a read-only provider with no purchase methods");
+            g.Interface.Menu.ShowSkills(new ReadOnlyTraining(), snapshot);
+            Check(g.Interface.FindChildren("Learn_lesson", "Button", true, false).OfType<Button>().Any(b => b.IsVisibleInTree()),
+                "skill display accepts a read-only provider with no learning methods");
+            Check(g.Session.Wallet == originalCash, "replacing display providers cannot spend session money");
+            Press(g, "Back");
             Press(g, "Equipment"); int wallet = g.Session.Wallet;
             Press(g, "Buy_Rim"); Check(g.Session.Wallet == wallet && g.Interface.Menu.NoticeText.Contains("余额不足"), "unaffordable shop action is visible and non-destructive");
             await Capture(g, "04-shop");
@@ -134,7 +144,7 @@ internal static class ScenarioRunner
                     if (offer != null) { Press(g, "Equipment"); Press(g, "Buy_" + offer.Product.Id); Press(g, "Back"); }
                     Press(g, "Next"); await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame); continue;
                 }
-                var visible = g.Bench.Herd.Pigs.Where(p => p.Active).ToArray();
+                var visible = g.Herd.Pigs.Where(p => p.Active).ToArray();
                 Vector2 bestPoint = new(466, 406); float bestScore = -1;
                 var candidates = visible.Select(g.Bench.ScreenPosition).Concat(visible.SelectMany(a => visible.Select(b => (g.Bench.ScreenPosition(a) + g.Bench.ScreenPosition(b)) / 2)));
                 foreach (var point in candidates)

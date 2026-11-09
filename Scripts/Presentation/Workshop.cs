@@ -5,6 +5,7 @@ using System;
 public partial class Workshop : Node2D
 {
     internal GameSession Session { get; private set; } = new();
+    internal PigHerd Herd { get; private set; } = new(HerdLayout.Initial);
     internal WorkbenchView Bench { get; private set; } = null!;
     internal WorkshopUi Interface { get; private set; } = null!;
     private readonly HammerSwing _hammer = new();
@@ -21,6 +22,7 @@ public partial class Workshop : Node2D
         AddChild(Bench);
         AddChild(_audio);
         AddChild(Interface);
+        Bench.Bind(Herd.Pigs);
         var menu = Interface.Menu;
         var hud = Interface.Hud;
         menu.Start += Begin;
@@ -82,7 +84,7 @@ public partial class Workshop : Node2D
         _hammer.Reset();
         _settleDelay = 0;
         _pointerPosition = new(-1, -1);
-        Bench.ResetPigs();
+        ResetHerd();
         Bench.Radius = 1.43f + Session.ExtraRadius;
         Interface.Menu.Close();
         Interface.Hud.Show();
@@ -94,13 +96,18 @@ public partial class Workshop : Node2D
         Session = new GameSession();
         _hammer.Reset();
         _settleDelay = 0;
-        Bench.ResetPigs();
+        ResetHerd();
         Refresh();
         Interface.Menu.ShowTitle();
     }
     private void Pause()
     {
         if (Session.Phase == ShiftPhase.Working && !Interface.Menu.IsOpen) Interface.Menu.ShowPause();
+    }
+    private void ResetHerd()
+    {
+        Herd = new PigHerd(HerdLayout.Initial);
+        Bench.Bind(Herd.Pigs);
     }
     private void Resume()
     {
@@ -178,12 +185,14 @@ public partial class Workshop : Node2D
         Bench.ShowPigs = Session.Phase != ShiftPhase.Ready;
         if (active)
         {
-            Bench.Tick(dt, true);
+            Herd.Advance(dt);
+            Bench.Tick(dt);
             if (Session.Stamina > 0 && Bench.PlayArea.HasPoint(_pointerPosition))
                 _hammer.Begin(_pointerPosition);
             if (_hammer.Advance(dt, Session.RecoveryReduction) &&
-                Session.TrySwing(Bench.TargetsAt(_hammer.Aim), out var result, out int coins))
+                Session.TrySwing(Herd.Targets(Bench.WorldPosition(_hammer.Aim), Bench.Radius), out var result, out int coins))
             {
+                Herd.Apply(result!);
                 Bench.Impact(_hammer.Aim, result!, coins);
                 _audio.Play(result!.HitCount, coins);
                 Refresh();

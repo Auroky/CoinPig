@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -5,9 +6,15 @@ public enum SkillStatus { Available, Learned, Locked, InsufficientFunds, Closed,
 public sealed record SkillOffer(SkillDefinition Skill, SkillStatus Status);
 public sealed record SkillResult(bool Succeeded, SkillStatus Status, int CashSpent = 0);
 
-public interface ISkillTree
+/// <summary>Read-only offers used by skill displays.</summary>
+public interface ISkillTreeView
 {
     IReadOnlyList<SkillOffer> GetSkills();
+}
+
+/// <summary>Learning succeeds once; a rejected command preserves all state and spends no cash.</summary>
+public interface ISkillTree : ISkillTreeView
+{
     SkillResult TryLearn(string id);
 }
 
@@ -15,7 +22,37 @@ public interface ISkillTree
 public sealed class SkillProgress
 {
     private readonly HashSet<string> _learned = new();
+    private readonly IReadOnlyList<SkillDefinition> _catalog;
     public SkillBonus TotalBonus { get; private set; } = new();
+
+    public SkillProgress(IReadOnlyList<SkillDefinition> catalog)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        var snapshot = catalog.ToArray();
+        if (snapshot.Any(skill => skill == null || string.IsNullOrWhiteSpace(skill.Id) ||
+            skill.Cost < 0 || skill.Bonus == null || !ValidBonus(skill.Bonus)) ||
+            snapshot.Select(skill => skill.Id).Distinct().Count() != snapshot.Length)
+            throw new ArgumentException("Skills need unique IDs, nonnegative costs and finite bonuses.", nameof(catalog));
+        var byId = snapshot.ToDictionary(skill => skill.Id);
+        foreach (var skill in snapshot)
+        {
+            var visited = new HashSet<string> { skill.Id };
+            var parent = skill.ParentId;
+            while (parent != null)
+            {
+                if (!byId.TryGetValue(parent, out var prerequisite) || !visited.Add(parent))
+                    throw new ArgumentException("Skill prerequisites must exist and form an acyclic graph.", nameof(catalog));
+                parent = prerequisite.ParentId;
+            }
+        }
+        _catalog = Array.AsReadOnly(snapshot);
+    }
+
+    private static bool ValidBonus(SkillBonus bonus) =>
+        bonus.Stamina >= 0 && bonus.Damage >= 0 && bonus.Refunds >= 0 &&
+        bonus.PairCoins >= 0 && bonus.PigCoins >= 0 && bonus.TripleCoins >= 0 &&
+        float.IsFinite(bonus.Radius) && bonus.Radius >= 0 &&
+        float.IsFinite(bonus.Recovery) && bonus.Recovery >= 0;
 
     private SkillStatus Status(SkillDefinition skill, bool open, int wallet)
     {
@@ -27,17 +64,18 @@ public sealed class SkillProgress
     }
 
     public IReadOnlyList<SkillOffer> Quote(bool open, int wallet) =>
-        SkillCatalog.Nodes.Select(skill => new SkillOffer(skill, Status(skill, open, wallet))).ToArray();
+        _catalog.Select(skill => new SkillOffer(skill, Status(skill, open, wallet))).ToArray();
 
     internal SkillResult TryLearn(string id, bool open, int wallet)
     {
-        var skill = SkillCatalog.Nodes.FirstOrDefault(node => node.Id == id);
+        var skill = _catalog.FirstOrDefault(node => node.Id == id);
         if (skill == null) return new(false, SkillStatus.UnknownSkill);
         var status = Status(skill, open, wallet);
         if (status != SkillStatus.Available)
             return new(false, status);
+        var updated = TotalBonus.Add(skill.Bonus);
         _learned.Add(id);
-        TotalBonus = TotalBonus.Add(skill.Bonus);
+        TotalBonus = updated;
         return new(true, SkillStatus.Learned, skill.Cost);
     }
 }
