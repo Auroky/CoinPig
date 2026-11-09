@@ -107,7 +107,7 @@ internal static class SolidExtensionChecks
         session = new GameSession(DefaultGame.Definition(rewardRules: new ISwingRewardRule[] { new FailingRule() }));
         session.BeginShift(); var target = Pig();
         check(Rejects<InvalidOperationException>(() => session.TrySwing(new[] { target }, out _, out _)), "an unsuccessful reward extension reports its error");
-        check(target.Health == 1 && session.Stamina == 12 && session.Wallet == 0 && session.ShiftPigs == 0,
+        check(target.Health == 1 && session.Stamina == session.Capacity && session.Wallet == 0 && session.ShiftPigs == 0,
             "failed extensions cannot partially damage targets or spend resources");
         session.TrySwing(Array.Empty<PigState>(), out _, out coins);
         check(coins == 1, "a failed extension does not consume its daily budget");
@@ -118,7 +118,7 @@ internal static class SolidExtensionChecks
             bool rejected = invalid < 0
                 ? Rejects<InvalidOperationException>(() => session.TrySwing(new[] { target }, out _, out _))
                 : Rejects<OverflowException>(() => session.TrySwing(new[] { target }, out _, out _));
-            check(rejected && target.Health == 1 && session.Stamina == 12 && session.Wallet == 0,
+            check(rejected && target.Health == 1 && session.Stamina == session.Capacity && session.Wallet == 0,
                 "invalid or overflowing custom payouts fail before any game-state mutation");
         }
 

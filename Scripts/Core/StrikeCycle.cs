@@ -6,13 +6,18 @@ public sealed class StrikeCycle
     public bool Pending { get; private set; }
     public float Windup { get; private set; }
     public float Cooldown { get; private set; }
+    public float AimLockSeconds => _timing.AimLockSeconds;
     public StrikeCycle(SwingTiming timing)
     {
         ArgumentNullException.ThrowIfNull(timing);
         if (!float.IsFinite(timing.Windup) || timing.Windup <= 0 ||
             !float.IsFinite(timing.Recovery) || timing.Recovery <= 0 ||
             !float.IsFinite(timing.MinimumRecovery) || timing.MinimumRecovery <= 0 ||
-            timing.MinimumRecovery > timing.Recovery || !float.IsFinite(timing.SettlementDelay) || timing.SettlementDelay <= 0)
+            timing.MinimumRecovery > timing.Recovery || !float.IsFinite(timing.SettlementDelay) || timing.SettlementDelay <= 0 ||
+            !float.IsFinite(timing.AimLockSeconds) || timing.AimLockSeconds < 0 || timing.AimLockSeconds > timing.Windup ||
+            !float.IsFinite(timing.OpeningDelay) || timing.OpeningDelay < 0 ||
+            !float.IsFinite(timing.RetargetSettleSeconds) || timing.RetargetSettleSeconds < 0 ||
+            !float.IsFinite(timing.RetargetSpeed) || timing.RetargetSpeed <= 0)
             throw new ArgumentException("Swing timing must be finite and positive.", nameof(timing));
         _timing = timing;
     }
@@ -35,4 +40,5 @@ public sealed class StrikeCycle
         return true;
     }
     public void Reset() { Pending = false; Windup = Cooldown = 0; }
+    public void CancelWindup() { Pending = false; Windup = 0; }
 }

@@ -50,6 +50,7 @@ public partial class Workshop : Node2D
         menu.Equipment += OpenEquipment;
         menu.Skills += OpenSkills;
         menu.Purchase += Purchase;
+        menu.Equip += Equip;
         menu.Learn += Learn;
         menu.Choose += Choose;
         menu.Fullscreen += ToggleFullscreen;
@@ -62,7 +63,9 @@ public partial class Workshop : Node2D
         menu.ShowTitle();
         hud.Hide();
 #if DEBUG
-        if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--verify") >= 0)
+        if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--verify-equipment") >= 0)
+            _ = EquipmentScenario.Run(this);
+        else if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--verify") >= 0)
             _ = ScenarioRunner.Run(this);
 #endif
     }
@@ -82,6 +85,12 @@ public partial class Workshop : Node2D
         Refresh();
         OpenEquipment();
         Interface.Menu.Notify(GameText.Purchase(result));
+    }
+    private void Equip(string id)
+    {
+        var result = Session.TryEquip(id);
+        Refresh(); OpenEquipment();
+        Interface.Menu.Notify(result.Succeeded ? $"已装备 {Session.EquippedWeapon.Weapon.Name} · 无需额外金币" : "尚未拥有这件武器");
     }
     private void Learn(string id)
     {
@@ -106,7 +115,7 @@ public partial class Workshop : Node2D
         Interface.Menu.Close();
         Interface.Hud.Show();
         Refresh();
-        if (Session.Shift == 1) Interface.Hud.Notify("移动鼠标瞄准 · 锤子自动挥动");
+        Interface.Hud.Notify("开局准备 · 瞄准一只猪后自动挥锤，无需点击");
     }
     private void Restart()
     {
@@ -124,6 +133,8 @@ public partial class Workshop : Node2D
     private void BindHerd()
     {
         Bench.Bind(Herd.Pigs);
+        if (Bench is IEquipmentPresentation equipment) equipment.SetEquipment(Session.EquippedWeapon, Session.EquippedAccessory);
+        _audio.SetWeapon(Session.EquippedWeapon);
     }
     private void Resume()
     {
@@ -136,10 +147,10 @@ public partial class Workshop : Node2D
         if (Session.Phase != ShiftPhase.Working) return;
         if (_run.Hammer.Pending)
         {
-            Interface.Hud.Notify("等待落锤完成");
+            Interface.Hud.Notify("等待本次攻击完成");
             return;
         }
-        if (Session.Stamina > 0 && Interface.Menu.Page != MenuPage.EndDay)
+        if (Session.CanAttack && Interface.Menu.Page != MenuPage.EndDay)
             Interface.Menu.ShowEndDay(Session.Stamina);
         else if (_run.EndShift()) ShowSettlement();
     }
@@ -203,17 +214,28 @@ public partial class Workshop : Node2D
         if (active)
         {
             Bench.Tick(dt);
-            bool startsSwing = Session.Stamina > 0 && overTable && !_run.Hammer.Pending && _run.Hammer.Cooldown <= 0;
+            bool wasPending = _run.Hammer.Pending;
             var outcome = _run.Advance(dt, overTable ? worldPoint : null);
-            if (startsSwing) _audio.PlaySwing();
+            if (!wasPending && _run.Hammer.Pending) _audio.PlaySwing();
+            if (!_run.AutomaticAim.HasLanded && !_run.Hammer.Pending)
+                Interface.Hud.Notify(_run.AutomaticAim.OpeningRemaining > 0
+                    ? $"开局准备 {_run.AutomaticAim.OpeningRemaining:0.0}s · 移动鼠标瞄准"
+                    : "瞄准一只猪，工具会自动攻击 · 无需点击");
             if (outcome != null)
             {
                 _strikeFeedback.Present(outcome);
                 Refresh();
             }
+            foreach (var effect in _run.EffectOutcomes)
+            {
+                if (Bench is ICombatEffectFeedback feedback) feedback.PresentEffect(effect);
+                if (effect.Strike.HitCount > 0) _audio.PlayImpact(effect.Strike);
+                if (effect.Coins > 0) Interface.Hud.ShowEffect(() => Bench.ScreenPosition(effect.Point), effect);
+                Refresh();
+            }
             if (Session.Phase != ShiftPhase.Working) ShowSettlement();
         }
-        Bench.Aim = _run.Hammer.Pending ? Bench.ScreenPosition(_run.StrikePoint) : _pointerPosition;
+        Bench.Aim = _run.IsAimLocked ? Bench.ScreenPosition(_run.StrikePoint) : _pointerPosition;
         Bench.Windup = _run.Hammer.Windup;
         Bench.Cooldown = _run.Hammer.Cooldown;
         Bench.Present();

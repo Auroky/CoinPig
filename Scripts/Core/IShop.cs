@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 
-public enum PurchaseStatus { Available, Purchased, Closed, UnknownProduct, SoldOut, InsufficientFunds, StaleOffer }
+public enum PurchaseStatus { Available, Purchased, Closed, UnknownProduct, SoldOut, InsufficientFunds, StaleOffer, Locked }
 
-public sealed record ShopOffer(ShopProduct Product, int Level, int Price, PurchaseStatus Status);
+public sealed record ShopOffer(ShopProduct Product, int Level, int Price, PurchaseStatus Status,
+    string LockReason = "", bool Equipped = false);
 public sealed record PurchaseResult(PurchaseStatus Status, int CashSpent = 0)
 {
     public bool Succeeded => Status == PurchaseStatus.Purchased;

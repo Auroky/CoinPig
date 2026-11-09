@@ -11,8 +11,10 @@ public sealed class StrikeSummary
     public int DestroyedCount { get; }
     public int BaseCoins { get; }
     public IReadOnlyList<PigHitSnapshot> Targets { get; }
-    internal StrikeSummary(SwingResult strike)
+    public int StaminaSpent { get; }
+    internal StrikeSummary(SwingResult strike, int staminaSpent = 1)
     {
+        StaminaSpent = staminaSpent;
         HitCount = strike.HitCount; DestroyedCount = strike.DestroyedCount; BaseCoins = strike.BaseCoins;
         Targets = Array.AsReadOnly(strike.Targets.Select(hit =>
             new PigHitSnapshot(hit.Pig.Definition, hit.Result.Destroyed, hit.Result.RemainingHealth)).ToArray());

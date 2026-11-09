@@ -7,6 +7,7 @@ public static class GameText
         PurchaseStatus.SoldOut => "已达到最高等级",
         PurchaseStatus.Closed => "收工后可以购买",
         PurchaseStatus.StaleOffer => "价格已更新，请重新选择",
+        PurchaseStatus.Locked => "需要先完成前置装备升级",
         _ => "商品不存在"
     };
 

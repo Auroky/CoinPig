@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 /// <summary>Maps world-space pigs to the workbench and draws the aiming tool.</summary>
-public partial class WorkbenchView : Node2D, IWorkbench, IPigAppearanceConsumer
+public partial class WorkbenchView : Node2D, IWorkbench, IPigAppearanceConsumer, IEquipmentPresentation, ICombatEffectFeedback
 {
     public IPigAppearanceSource Appearances { private get; set; } = new PigRoster(Array.Empty<PigArchetype>());
     private IReadOnlyList<PigMotion> _pigs = Array.Empty<PigMotion>();
@@ -28,6 +28,8 @@ public partial class WorkbenchView : Node2D, IWorkbench, IPigAppearanceConsumer
     public Rect2 PlayArea => new(Origin + new Vector2(-7.4f, -3.85f) * UnitScale, new Vector2(14.8f, 7.7f) * UnitScale);
     private readonly Dictionary<PigState, float> _flashes = new();
     private StrikeEffects _effects = null!;
+    private readonly EquipmentIcons _icons = EquipmentIcons.CreateDefault();
+    private WeaponLoadout _weapon = new(new("basic", "基础工具", new CircularWeaponAttack()), 0, ShopProduct.StandardPalette, null);
 
     public override void _Ready()
     {
@@ -74,6 +76,18 @@ public partial class WorkbenchView : Node2D, IWorkbench, IPigAppearanceConsumer
     }
 
     public void Present() => QueueRedraw();
+    public void SetEquipment(WeaponLoadout weapon, EquipmentTier? accessory) => _weapon = weapon;
+    public void PresentEffect(EffectOutcome effect)
+    {
+        foreach (var hit in effect.Strike.Targets)
+        {
+            var pig = _pigs.FirstOrDefault(p => ReferenceEquals(p.State, hit.Pig));
+            if (pig == null) continue;
+            _flashes[hit.Pig] = .22f;
+            if (hit.Result.Destroyed) _effects.Break(ScreenPosition(pig), new Color(Appearances.GetAppearance(hit.Pig.Definition.Id).Body2D));
+        }
+        _effects.Strike(ScreenPosition(effect.Point), effect.Radius * UnitScale);
+    }
 
     public override void _Draw()
     {
@@ -86,19 +100,7 @@ public partial class WorkbenchView : Node2D, IWorkbench, IPigAppearanceConsumer
         DrawArc(Aim, radius, 0, Mathf.Tau, 96, ring, 1.5f, true);
         DrawLine(Aim - new Vector2(5, 0), Aim + new Vector2(5, 0), ring, 1);
         DrawLine(Aim - new Vector2(0, 5), Aim + new Vector2(0, 5), ring, 1);
-        DrawHammer(Aim + new Vector2(20, -23 - Windup * 150), Windup * -2);
+        _icons.Draw(this, _weapon.Weapon.Appearance, _weapon.Palette, Aim + new Vector2(20, -23 - Windup * 150), Windup * -2, UnitScale / 65);
     }
 
-    private void DrawHammer(Vector2 position, float rotation)
-    {
-        DrawSetTransform(position, rotation, Vector2.One * (UnitScale / 65));
-        DrawLine(new(8, 0), new(42, 44), new Color(0, 0, 0, .3f), 13, true);
-        DrawLine(new(6, -2), new(39, 40), new("a77945"), 10, true);
-        DrawLine(new(25, 22), new(40, 41), new("342b22"), 13, true);
-        DrawRect(new(-29, -22, 60, 35), new("252e28"));
-        DrawRect(new(-27, -20, 8, 31), new("9da28a"));
-        DrawRect(new(21, -20, 8, 31), new("9da28a"));
-        DrawRect(new(-3, -21, 7, 33), new("bfa06b"));
-        DrawSetTransform(Vector2.Zero);
-    }
 }

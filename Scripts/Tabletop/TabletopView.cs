@@ -4,12 +4,13 @@ using System.Collections.Generic;
 using WorldPoint = System.Numerics.Vector2;
 
 /// <summary>3D adapter for the same planar tabletop rules used by the canvas view.</summary>
-public partial class TabletopView : Node3D, IWorkbench, IRewardFeedback, IPigAppearanceConsumer
+public partial class TabletopView : Node3D, IWorkbench, IRewardFeedback, IPigAppearanceConsumer, IEquipmentPresentation, ICombatEffectFeedback
 {
     public IPigAppearanceSource Appearances { private get; set; } = new PigRoster(Array.Empty<PigArchetype>());
+    public CombatEffectVisuals EffectVisuals { get; set; } = CombatEffectVisuals.CreateDefault();
     private readonly TabletopMaterials _materials = new();
     private readonly Dictionary<PigState, PigModel> _models = new();
-    private HammerModel _hammer = null!;
+    private WeaponModel _hammer = null!;
     private ImpactBurst _effects = null!;
     private CameraFeedback _feedback = null!;
     private WorldPoint _lastAim;
@@ -28,7 +29,7 @@ public partial class TabletopView : Node3D, IWorkbench, IRewardFeedback, IPigApp
     {
         var camera = WorkshopSet.Build(this, _materials);
         _feedback = new CameraFeedback(camera);
-        _hammer = new HammerModel(); AddChild(_hammer); _hammer.Assemble(_materials);
+        _hammer = new WeaponModel(); AddChild(_hammer); _hammer.Assemble(_materials);
         _effects = new ImpactBurst { Name = "ImpactEffects" }; AddChild(_effects); _effects.Assemble(_materials);
         _effects.CoinCollected += () => CoinCollected?.Invoke();
         _hammer.Hide();
@@ -86,6 +87,20 @@ public partial class TabletopView : Node3D, IWorkbench, IRewardFeedback, IPigApp
             else _effects.HitSparks(model.Motion.Position);
         }
         _effects.Strike(point, strike, Radius);
+    }
+    public void SetEquipment(WeaponLoadout weapon, EquipmentTier? accessory) => _hammer.SetEquipment(weapon, accessory);
+    public void PresentEffect(EffectOutcome effect)
+    {
+        _feedback.PointAt(CoinDestination, .8f, out var destination);
+        foreach (var hit in effect.Strike.Targets)
+        {
+            if (!_models.TryGetValue(hit.Pig, out var model)) continue;
+            model.Hit(hit.Result);
+            if (hit.Result.Destroyed)
+                _effects.Break(model.Motion.Position, effect.Point, model.Glaze, model.Interior, model.BodyScale, hit.Pig.Definition.Coins, destination);
+            else _effects.HitSparks(model.Motion.Position);
+        }
+        EffectVisuals.Present(_effects, effect);
     }
 
     public void Present()

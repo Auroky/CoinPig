@@ -14,7 +14,11 @@ public partial class UpgradeGallery : Control
     private Node3D _world = null!;
     private Control _hotspots = null!;
     private GalleryArt _art = null!;
+    public EquipmentModelRegistry EquipmentModels { get; set; } = EquipmentModelRegistry.CreateDefault();
+    private readonly List<EquipmentModelParts> _equipment = new();
+    private float _time;
     public event Action<string, int>? Purchase;
+    public event Action<string>? Equip;
     public event Action<string>? Learn;
     public event Action<string>? Message;
 
@@ -101,24 +105,45 @@ public partial class UpgradeGallery : Control
         for (int column = 0; column < offers.Count; column++)
         {
             var offer = offers[column];
+            var heading = _art.Label(cabinet, $"{new string('I', offer.Product.Stage)} · {offer.Product.Name}",
+                new(-5.92f + (column + .5f) * columnWidth, 6.48f, 1.28f), 30, .0068f);
+            heading.NoDepthTest = true;
             for (int tier = 0; tier < offer.Product.MaxLevel; tier++)
             {
                 int selectedTier = tier;
                 var item = new Node3D { Position = new(-5.92f + (column + .5f) * columnWidth, 6.61f - (tier + .5f) * rowHeight, .1f) };
                 _world.AddChild(item);
-                var display = new Node3D { Scale = Vector3.One * modelScale }; item.AddChild(display);
-                if (offer.Product.Appearance == "cuff") _art.Cuff(display, tier); else _art.Hammer(display, tier);
-                SceneShapes.Box(display, new(0, -.68f, 1.08f), new(3, .70f, .06f), _materials.Paint("282c29"));
-                string status = tier < offer.Level ? "已购入" : tier > offer.Level ? "未解锁" :
+                var visual = offer.Product.TierAt(tier);
+                var display = new Node3D { Position = new(0, .2f, 0), Scale = Vector3.One * Mathf.Max(.62f, modelScale),
+                    RotationDegrees = new(0, offer.Product.DisplayYaw, -6) }; item.AddChild(display);
+                var equipment = EquipmentModels.Build(offer.Product.Appearance, display, _materials, visual.Palette, tier + 1);
+                equipment.Animate(0, .2f); _equipment.Add(equipment);
+                bool owned = tier < offer.Level;
+                string status = owned ? (tier == offer.Level - 1
+                    ? (offer.Product.Weapon != null ? (offer.Equipped ? "已装备" : "点击切换") : "当前生效")
+                    : (offer.Product.Weapon != null ? "已拥有 · 切换" : "已升级替代")) :
+                    tier > offer.Level ? $"先升 Lv.{tier}" : offer.Status == PurchaseStatus.Locked ? "前置未满足" :
                     offer.Status == PurchaseStatus.InsufficientFunds ? $"¥{offer.Price} · 余额不足" : $"¥{offer.Price} · 点击购买";
-                var caption = _art.Label(item, $"{offer.Product.Name} {tier + 1}\n{status}", new(0, -.68f * modelScale, 1.15f), 33, .01f * modelScale);
-                caption.Modulate = new(tier < offer.Level ? "b6c9a1" : tier == offer.Level ? "ffe0a0" : "9a8a73");
-                string description = $"{offer.Product.Name} · 第 {tier + 1} 阶    {offer.Product.Description}    {status}";
-                string name = tier == offer.Level ? "Buy_" + offer.Product.Id : $"Buy_{offer.Product.Id}_Tier_{tier}";
+                SceneShapes.Box(item, new(0, -.62f, 1.08f), new(columnWidth - .3f, .68f, .06f), _materials.Paint("202e35"));
+                var caption = _art.Label(item, $"{visual.Name}\nLv.{tier + 1} · {status}", new(0, -.62f, 1.15f), 30, .0068f);
+                caption.Modulate = new(owned && tier == offer.Level - 1 ? "a9eee1" : tier == offer.Level && offer.Status != PurchaseStatus.Locked ? "ffe2a1" : "c0b8ac");
+                string description = $"{visual.Name} · Lv.{tier + 1} · ¥{offer.Product.PriceAt(tier)}  |  {offer.Product.Description.Replace("\n", " ")}  {visual.Description.Replace("\n", " ")}" +
+                    (offer.LockReason.Length > 0 ? $"  |  解锁需要：{offer.LockReason}" : "") + (owned && offer.Product.Weapon != null ? "  |  点击免费切换至该武器最高已购等级" : "");
+                string name = tier == offer.Level ? "Buy_" + offer.Product.Id : owned && offer.Product.Weapon != null
+                    ? $"Equip_{offer.Product.Id}_Tier_{tier}" : $"Buy_{offer.Product.Id}_Tier_{tier}";
                 AddChoice(item, new(columnWidth - .82f, rowHeight - .24f), name, description, () =>
                 {
-                    if (selectedTier < offer.Level) Message?.Invoke("这件升级已购入并自动装备。");
+                    if (selectedTier < offer.Level)
+                    {
+                        if (offer.Product.Weapon != null) Equip?.Invoke(offer.Product.Id);
+                        else
+                        {
+                            var current = offer.Product.TierAt(offer.Level - 1);
+                            Message?.Invoke(current.Name + " 当前生效 · " + current.Description.Replace("\n", " "));
+                        }
+                    }
                     else if (selectedTier > offer.Level) Message?.Invoke("先购买上一阶，再解锁这一阶。");
+                    else if (offer.Status == PurchaseStatus.Locked) Message?.Invoke("解锁需要：" + offer.LockReason);
                     else Purchase?.Invoke(offer.Product.Id, selectedTier);
                 });
             }
@@ -174,5 +199,10 @@ public partial class UpgradeGallery : Control
     public override void _ExitTree()
     {
         _art?.Dispose(); _materials.Dispose();
+    }
+    public override void _Process(double delta)
+    {
+        _time += (float)delta;
+        foreach (var model in _equipment) model.Animate(_time, .25f);
     }
 }

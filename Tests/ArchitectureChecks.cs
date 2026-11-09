@@ -112,23 +112,23 @@ internal static class ArchitectureChecks
         session.BeginShift(); FundDay(session); session.BeginShift(); FundDay(session);
         check(session.Offers.Single() == card, "reward offers use a protected injected catalogue");
         check(Rejects<NotSupportedException>(() => ((IList<PerkCard>)session.Offers)[0] = card with { Bonus = new(Stamina: 99) }), "available rewards cannot be replaced through a mutable cast");
-        check(session.Choose(PerkContent.Lunch) && session.Capacity == 15 && session.ExtraRadius == .25f, "perk values determine passive bonuses instead of enum-specific branches");
+        check(session.Choose(PerkContent.Lunch) && session.Capacity == BalanceContent.Tuning.StartingStamina + 3 && session.ExtraRadius == .25f, "perk values determine passive bonuses instead of enum-specific branches");
         session.BeginShift();
         session.TrySwing(new[] { Pig(), Pig() }, out _, out int coins);
-        check(coins == 10 && session.Stamina == 15, "configured pair reward, limited bonus and refund compose correctly");
+        check(coins == 10 && session.Stamina == BalanceContent.Tuning.StartingStamina + 3, "configured pair reward, limited bonus and refund compose correctly");
         session.TrySwing(new[] { Pig() }, out _, out coins);
         check(coins == 6, "single-target reward consumes only the remaining limited bonus");
         session.TrySwing(new[] { Pig() }, out _, out coins);
         check(coins == 5, "limited coin bonus stops at its configured cap");
         session.CloseShift(); session.BeginShift();
         session.TrySwing(new[] { Pig(), Pig() }, out _, out coins);
-        check(coins == 10 && session.Stamina == 15, "per-day reward limits reset together on a new day");
+        check(coins == 10 && session.Stamina == BalanceContent.Tuning.StartingStamina + 3, "per-day reward limits reset together on a new day");
 
         session = DefaultGame.CreateSession(); session.BeginShift();
         var target = Pig();
         check(Rejects<InvalidOperationException>(() => session.TrySwing(InterruptedTargets(target), out _, out _)), "a broken target source rejects the command");
-        check(target.Health == 1 && session.Stamina == 12 && session.Wallet == 0, "target enumeration failure leaves health and resources unchanged");
+        check(target.Health == 1 && session.Stamina == session.Capacity && session.Wallet == 0, "target enumeration failure leaves health and resources unchanged");
         check(Rejects<ArgumentException>(() => session.TrySwing(new[] { target, null! }, out _, out _)), "null targets are rejected before damage");
-        check(target.Health == 1 && session.Stamina == 12 && session.Wallet == 0, "invalid target validation cannot partially apply a swing");
+        check(target.Health == 1 && session.Stamina == session.Capacity && session.Wallet == 0, "invalid target validation cannot partially apply a swing");
     }
 }

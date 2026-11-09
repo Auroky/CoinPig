@@ -58,6 +58,10 @@ internal static class ScenarioRunner
             await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame);
             await Capture(g, "01-intro");
             Press(g, "Start"); Check(g.Session.Phase == ShiftPhase.Working && !g.Interface.Menu.IsOpen, "start button begins playable day");
+            int openingStamina = g.Session.Stamina;
+            MovePointer(g, g.Bench.ScreenPosition(g.Herd.Pigs[0])); Tick(g, .5f);
+            Check(g.Session.Stamina == openingStamina, "entering the table immediately after Start cannot spend stamina during opening preparation");
+            MovePointer(g, new(-100, -100));
             foreach (var point in new[] { new System.Numerics.Vector2(-6, -3), new(0, 0), new(6, 3) })
             {
                 Vector2 screen = g.Bench.ScreenPosition(point);
@@ -95,7 +99,7 @@ internal static class ScenarioRunner
             if (g.Bench is IRewardFeedback rewardFeedback) rewardFeedback.CoinCollected += () => arrivals++;
             int stamina = g.Session.Stamina;
             Tick(g, .8f);
-            Check(g.Session.Stamina == stamina, "starting or resuming waits for pointer movement");
+            Check(g.Session.Stamina == stamina, "an outside pointer never starts automatic swings");
             MovePointer(g, new(-100, -100)); Tick(g, .8f);
             Check(g.Session.Stamina == stamina, "outside pointer does not spend stamina");
             Press(g, "Pause");
@@ -111,7 +115,7 @@ internal static class ScenarioRunner
             var screenTarget = g.GetViewport().GetScreenTransform() * g.GetGlobalTransformWithCanvas() * target;
             Input.ParseInputEvent(new InputEventMouseMotion { Position = screenTarget, GlobalPosition = screenTarget, Relative = Vector2.One });
             Input.FlushBufferedEvents();
-            Tick(g, .25f);
+            Tick(g, .30f);
             Check(g.Session.Stamina == stamina - 1 && g.Session.ShiftPigs >= 1, "mouse movement alone lands a hit without a button press");
             if (g.Bench is TabletopView)
             {

@@ -42,10 +42,10 @@ public sealed class SwingRewards
             return granted;
         }
     }
-    internal Quote Prepare(SwingResult strike, Bonus bonus)
+    internal Quote Prepare(SwingResult strike, Bonus bonus, int staminaSpent = 1)
     {
         var budget = new Budget(_used);
-        var summary = new StrikeSummary(strike);
+        var summary = new StrikeSummary(strike, staminaSpent);
         int coins = strike.BaseCoins, refunds = 0;
         foreach (var rule in _rules)
         {

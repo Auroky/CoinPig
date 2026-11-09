@@ -7,6 +7,7 @@ public sealed class ShopInventory
 {
     private readonly IReadOnlyList<ShopProduct> _catalog;
     private readonly Dictionary<string, int> _levels = new();
+    public string? EquippedProductId { get; private set; }
 
     public Bonus TotalBonus { get; private set; } = new();
 
@@ -16,7 +17,10 @@ public sealed class ShopInventory
         var snapshot = catalog.ToArray();
         if (snapshot.Any(product => product == null || string.IsNullOrWhiteSpace(product.Id) ||
             product.BasePrice < 0 || product.PriceStep < 0 || product.MaxLevel <= 0 ||
-            product.Bonus == null || !product.Bonus.IsValid) ||
+            product.Bonus == null || !product.Bonus.IsValid || product.Stage <= 0 || !float.IsFinite(product.DisplayYaw) ||
+            (product.Tiers != null && (product.Tiers.Count != product.MaxLevel || product.Tiers.Any(t => t == null || t.Palette == null || !ValidPalette(t.Palette) ||
+                (t.Effects != null && t.Effects.Any(e => e == null || e.Create == null || string.IsNullOrWhiteSpace(e.Id)))))) ||
+            (product.Weapon != null && (string.IsNullOrWhiteSpace(product.Weapon.Id) || product.Weapon.Attack == null))) ||
             snapshot.Select(product => product.Id).Distinct().Count() != snapshot.Length)
             throw new ArgumentException("Products need unique IDs, valid prices and nonnegative finite bonuses.", nameof(catalog));
         try
@@ -27,8 +31,49 @@ public sealed class ShopInventory
         {
             throw new ArgumentException("Product prices exceed the supported range.", nameof(catalog), exception);
         }
-        _catalog = Array.AsReadOnly(snapshot);
+        var ids = snapshot.ToDictionary(p => p.Id);
+        foreach (var product in snapshot)
+        {
+            foreach (var requirement in product.Requirements ?? Array.Empty<ProductRequirement>())
+                if (requirement == null || !ids.TryGetValue(requirement.ProductId, out var prerequisite) ||
+                    requirement.Level <= 0 || requirement.Level > prerequisite.MaxLevel)
+                    throw new ArgumentException("Equipment prerequisites must refer to valid product levels.", nameof(catalog));
+        }
+        foreach (var product in snapshot) ValidateAcyclic(product.Id, ids, new HashSet<string>());
+        _catalog = Array.AsReadOnly(snapshot.Select(p => p with
+        {
+            Requirements = p.Requirements == null ? null : Array.AsReadOnly(p.Requirements.ToArray()),
+            Tiers = p.Tiers == null ? null : Array.AsReadOnly(p.Tiers.Select(t => t with
+            { Effects = t.Effects == null ? null : Array.AsReadOnly(t.Effects.ToArray()) }).ToArray())
+        }).ToArray());
     }
+
+    private static bool ValidPalette(EquipmentPalette palette) =>
+        new[] { palette.Body, palette.Trim, palette.Metal, palette.Grip, palette.Glow }
+            .All(c => c != null && c.Length == 6 && c.All(Uri.IsHexDigit));
+    private static void ValidateAcyclic(string id, Dictionary<string, ShopProduct> products, HashSet<string> ancestors)
+    {
+        if (!ancestors.Add(id)) throw new ArgumentException("Equipment prerequisites must be acyclic.");
+        foreach (var requirement in products[id].Requirements ?? Array.Empty<ProductRequirement>())
+            ValidateAcyclic(requirement.ProductId, products, ancestors);
+        ancestors.Remove(id);
+    }
+    public ShopProduct? EquippedProduct => EquippedProductId == null ? null : Find(EquippedProductId);
+    public IReadOnlyList<CombatEffectDefinition> ActiveEffects => _catalog.Where(p => (p.Weapon == null || p.Id == EquippedProductId) && Level(p.Id) > 0)
+        .SelectMany(p => p.TierAt(Level(p.Id) - 1).Effects ?? Array.Empty<CombatEffectDefinition>()).ToArray();
+    public EquipmentTier? AccessoryTier => _catalog.Where(p => p.Weapon == null && Level(p.Id) > 0)
+        .OrderByDescending(p => p.Stage).ThenByDescending(p => Level(p.Id)).Select(p => p.TierAt(Level(p.Id) - 1)).FirstOrDefault();
+    public Bonus EquippedBonus
+    {
+        get
+        {
+            var bonus = new Bonus(); var product = EquippedProduct;
+            if (product != null) for (int i = 0; i < Level(product.Id); i++) bonus = bonus.Add(product.Bonus);
+            return bonus;
+        }
+    }
+    public string LockReason(ShopProduct product) => string.Join("、", (product.Requirements ?? Array.Empty<ProductRequirement>())
+        .Where(r => Level(r.ProductId) < r.Level).Select(r => $"{Find(r.ProductId)!.Name} Lv.{r.Level}"));
 
     public ShopProduct? Find(string id) => _catalog.FirstOrDefault(product => product.Id == id);
     public int Level(string id) => _levels.GetValueOrDefault(id);
@@ -37,12 +82,14 @@ public sealed class ShopInventory
     {
         if (!open) return PurchaseStatus.Closed;
         if (Level(product.Id) >= product.MaxLevel) return PurchaseStatus.SoldOut;
+        if (LockReason(product).Length > 0) return PurchaseStatus.Locked;
         if (wallet < product.PriceAt(Level(product.Id))) return PurchaseStatus.InsufficientFunds;
         return PurchaseStatus.Available;
     }
 
     public IReadOnlyList<ShopOffer> Quote(int wallet, bool open) => _catalog.Select(product =>
-        new ShopOffer(product, Level(product.Id), product.PriceAt(Level(product.Id)), Availability(product, wallet, open))).ToArray();
+        new ShopOffer(product, Level(product.Id), product.PriceAt(Level(product.Id)), Availability(product, wallet, open),
+            LockReason(product), EquippedProductId == product.Id)).ToArray();
 
     internal PurchaseResult TryPurchase(string id, int expectedLevel, int wallet, bool open)
     {
@@ -53,9 +100,21 @@ public sealed class ShopInventory
         var status = Availability(product, wallet, open);
         if (status != PurchaseStatus.Available) return new(status);
         int price = product.PriceAt(expectedLevel);
-        var updated = TotalBonus.Add(product.Bonus);
+        var updated = product.Weapon == null ? TotalBonus.Add(product.Bonus) : TotalBonus;
         _levels[product.Id] = Level(product.Id) + 1;
         TotalBonus = updated;
+        if (product.Weapon != null && (EquippedProduct == null || product.Stage > EquippedProduct.Stage))
+            EquippedProductId = product.Id;
         return new(PurchaseStatus.Purchased, price);
+    }
+    internal EquipResult TryEquip(string id)
+    {
+        var product = Find(id);
+        if (product == null) return new(EquipStatus.UnknownProduct);
+        if (product.Weapon == null) return new(EquipStatus.NotAWeapon);
+        if (Level(id) == 0) return new(EquipStatus.NotOwned);
+        if (EquippedProductId == id) return new(EquipStatus.AlreadyEquipped);
+        EquippedProductId = id;
+        return new(EquipStatus.Equipped);
     }
 }

@@ -114,6 +114,11 @@ public partial class ImpactBurst : Node3D
         ring.Scale = Vector3.Zero;
         _pulses.Add(new Pulse { Node = ring, Radius = radius, Delay = delay });
     }
+    public void Resonance(System.Numerics.Vector2 point, float radius)
+    {
+        var at = new Vector3(point.X, 0, point.Y);
+        for (int i = 0; i < 3; i++) Ring(at, radius * (1 - i * .18f), true, i * .065f);
+    }
 
     public void Tick(float delta)
     {

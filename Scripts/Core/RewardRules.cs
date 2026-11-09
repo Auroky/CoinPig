@@ -29,5 +29,5 @@ public sealed class LimitedPigReward : ISwingRewardRule
 public sealed class ComboRefund : ISwingRewardRule
 {
     public SwingPayout Calculate(StrikeSummary strike, Bonus bonus, IRewardBudget budget) =>
-        new(0, strike.DestroyedCount >= 2 ? budget.Consume("combo-refunds", 1, bonus.Refunds) : 0);
+        new(0, strike.StaminaSpent > 0 && strike.DestroyedCount >= 2 ? budget.Consume("combo-refunds", 1, bonus.Refunds) : 0);
 }

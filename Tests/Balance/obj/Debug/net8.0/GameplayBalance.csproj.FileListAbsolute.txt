@@ -1,0 +1,15 @@
+D:\dxt\coding\xiaozu\CoinPig\Tests\Balance\bin\Debug\net8.0\GameplayBalance.exe
+D:\dxt\coding\xiaozu\CoinPig\Tests\Balance\bin\Debug\net8.0\GameplayBalance.deps.json
+D:\dxt\coding\xiaozu\CoinPig\Tests\Balance\bin\Debug\net8.0\GameplayBalance.runtimeconfig.json
+D:\dxt\coding\xiaozu\CoinPig\Tests\Balance\bin\Debug\net8.0\GameplayBalance.dll
+D:\dxt\coding\xiaozu\CoinPig\Tests\Balance\bin\Debug\net8.0\GameplayBalance.pdb
+D:\dxt\coding\xiaozu\CoinPig\Tests\Balance\obj\Debug\net8.0\GameplayBalance.GeneratedMSBuildEditorConfig.editorconfig
+D:\dxt\coding\xiaozu\CoinPig\Tests\Balance\obj\Debug\net8.0\GameplayBalance.AssemblyInfoInputs.cache
+D:\dxt\coding\xiaozu\CoinPig\Tests\Balance\obj\Debug\net8.0\GameplayBalance.AssemblyInfo.cs
+D:\dxt\coding\xiaozu\CoinPig\Tests\Balance\obj\Debug\net8.0\GameplayBalance.csproj.CoreCompileInputs.cache
+D:\dxt\coding\xiaozu\CoinPig\Tests\Balance\obj\Debug\net8.0\GameplayBalance.sourcelink.json
+D:\dxt\coding\xiaozu\CoinPig\Tests\Balance\obj\Debug\net8.0\GameplayBalance.dll
+D:\dxt\coding\xiaozu\CoinPig\Tests\Balance\obj\Debug\net8.0\refint\GameplayBalance.dll
+D:\dxt\coding\xiaozu\CoinPig\Tests\Balance\obj\Debug\net8.0\GameplayBalance.pdb
+D:\dxt\coding\xiaozu\CoinPig\Tests\Balance\obj\Debug\net8.0\GameplayBalance.genruntimeconfig.cache
+D:\dxt\coding\xiaozu\CoinPig\Tests\Balance\obj\Debug\net8.0\ref\GameplayBalance.dll

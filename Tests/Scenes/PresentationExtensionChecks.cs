@@ -42,6 +42,13 @@ internal static class PresentationExtensionChecks
             view.Tick(.05f); view.Present();
             if (adapter is TabletopView)
             {
+                var hammer = adapter.GetChildren().OfType<WeaponModel>().Single();
+                hammer.LandAt(System.Numerics.Vector2.Zero);
+                hammer.Present(new System.Numerics.Vector2(3, 0), 1.43f, 0, .39f, .01f, true);
+                check(hammer.VisualPosition.X > .1f, "3D hammer follows the next target immediately during recovery without an impact-position hold");
+            }
+            if (adapter is TabletopView)
+            {
                 var model = adapter.GetChildren().OfType<PigModel>().Single();
                 check(model.Glaze == new Color(appearance.Body3D) && model.BodyScale == appearance.Scale,
                     "3D adapter uses injected appearance for a species absent from built-in content");

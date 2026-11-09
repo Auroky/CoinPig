@@ -10,6 +10,8 @@ public partial class ImpactAudio : AudioStreamPlayer
     private readonly List<AudioStreamWav> _clips = new();
     private AudioStreamPlayer _air = null!, _crack = null!, _coins = null!;
     private AudioStreamWav _thud = null!, _empty = null!, _ceramic = null!, _metal = null!;
+    private readonly Dictionary<string, AudioStreamWav> _toolVoices = new();
+    private AudioStreamWav _normalSwing = null!;
 
     public override void _Ready()
     {
@@ -17,7 +19,10 @@ public partial class ImpactAudio : AudioStreamPlayer
         _air = Voice(-13, 1);
         _crack = Voice(-7, 4);
         _coins = Voice(-10, 4);
-        _air.Stream = MakeClip(0.18, (t, noise) => noise * Math.Sin(Math.PI * t / 0.18) * 0.34);
+        _normalSwing = MakeClip(0.18, (t, noise) => noise * Math.Sin(Math.PI * t / 0.18) * 0.34);
+        _air.Stream = _normalSwing;
+        _toolVoices["cut"] = MakeClip(.23, (t, noise) => (Math.Sin(t * 2 * Math.PI * 130) * .2 + noise * .28) * Math.Exp(-t * 6));
+        _toolVoices["grind"] = MakeClip(.34, (t, noise) => (Math.Sin(t * 2 * Math.PI * 510) * .11 + noise * .29) * Math.Exp(-t * 5));
         _thud = MakeClip(0.24, (t, noise) =>
             Math.Sin(2 * Math.PI * (82 * t + 3.5 * (1 - Math.Exp(-t * 42)))) * Math.Exp(-t * 23) * 0.72 +
             noise * Math.Exp(-t * 100) * 0.36);
@@ -51,6 +56,7 @@ public partial class ImpactAudio : AudioStreamPlayer
     }
 
     public void PlaySwing() => _air.Play();
+    public void SetWeapon(WeaponLoadout weapon) => _air.Stream = _toolVoices.TryGetValue(weapon.Weapon.Motion, out var voice) ? voice : _normalSwing;
     public void StopSwing() => _air.Stop();
 
     public void PlayImpact(SwingResult result)

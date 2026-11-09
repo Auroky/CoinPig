@@ -13,6 +13,7 @@ public partial class WorkshopMenu : Control
     public bool SpatialCatalogs { get; set; }
     public event Action? Start, EndDay, Restart, Resume, Equipment, Skills, Fullscreen, Quit;
     public event Action<string, int>? Purchase;
+    public event Action<string>? Equip;
     public event Action<string>? Learn;
     public event Action<string>? Choose;
     public MenuPage Page { get; private set; }
@@ -158,31 +159,7 @@ public partial class WorkshopMenu : Control
         row.AddChild(Label(value, size));
     }
 
-    public void ShowEquipment(IShopView shop, SessionSnapshot state)
-    {
-        if (SpatialCatalogs)
-        {
-            ShowGallery(shop, null, state);
-            return;
-        }
-        var body = Open(MenuPage.Equipment, "装备", $"余额 ¥{shop.Wallet}", new(1000, 650), () => ShowReceipt(state));
-        Rule(body);
-        var row = Row(body, 34);
-        foreach (var offer in shop.GetOffers())
-        {
-            var column = Column(row, 18);
-            column.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-            var illustration = new EquipmentSketch { Appearance = offer.Product.Appearance, CustomMinimumSize = new(0, 235), MouseFilter = MouseFilterEnum.Ignore };
-            column.AddChild(illustration);
-            column.AddChild(Label(offer.Product.Name, 27));
-            column.AddChild(Label($"等级 {offer.Level} / {offer.Product.MaxLevel}", 17, Muted));
-            column.AddChild(Label(offer.Product.Description, 18, Muted, true));
-            var button = Button(offer.Status == PurchaseStatus.SoldOut ? "已升满" : $"购入  ¥{offer.Price}", () => Purchase?.Invoke(offer.Product.Id, offer.Level), "Buy_" + offer.Product.Id, true);
-            button.Disabled = offer.Status == PurchaseStatus.SoldOut;
-            column.AddChild(button);
-        }
-        Back(body, () => ShowReceipt(state), "返回结算");
-    }
+    public void ShowEquipment(IShopView shop, SessionSnapshot state) => ShowGallery(shop, null, state);
 
     public void ShowSkills(ISkillTreeView skills, SessionSnapshot state)
     {
@@ -263,10 +240,11 @@ public partial class WorkshopMenu : Control
         var footer = new PanelContainer { CustomMinimumSize = new(0, 82) };
         footer.AddThemeStyleboxOverride("panel", barStyle);
         body.AddChild(footer);
-        _notice!.Text = training ? "沿金线解锁技能，使用金币购买。" : "点击柜中的锤子或护腕购买，自上而下逐阶解锁。";
+        _notice!.Text = training ? "沿金线解锁技能，使用金币购买。" : "I 锤具与护腕 → II 电锯 → III 砂轮 · 已购武器可免费切换。";
         _notice.VerticalAlignment = VerticalAlignment.Center;
         footer.AddChild(_notice);
         gallery.Purchase += (id, level) => Purchase?.Invoke(id, level);
+        gallery.Equip += id => Equip?.Invoke(id);
         gallery.Learn += id => Learn?.Invoke(id);
         gallery.Message += Notify;
         if (training) gallery.ShowSkills(skills!); else gallery.ShowProducts(shop!);
@@ -347,7 +325,7 @@ public partial class WorkshopMenu : Control
         var body = Open(MenuPage.Help, "玩法", "", new(780, 620), back);
         string pigs = string.Join("\n", PigDefinitions.Select(pig =>
             $"{pig.Name}：{pig.MaxHealth} 点耐久，速度 ×{pig.Speed:0.##}，击碎 ¥{pig.Coins}。"));
-        body.AddChild(Label($"移动鼠标瞄准，锤子会自动连续挥动，无需点击。\n空锤也消耗体力；将鼠标移出桌面可停止新的挥锤。\n\n{pigs}\n基础锤击每次造成 1 点伤害。击碎后会不断重生。\n\n第 2、4、6、8、10 天收工时交租。余额不足则破产。\n收工后可买装备、学技能。完成全部账单即获胜。", 21, Text, true));
+        body.AddChild(Label($"移动鼠标瞄准，工具会自动连续攻击，无需点击。\n开局有准备时间，瞄准猪后才开始；快速换目标会短暂缓攻。\n空击也消耗体力；将鼠标移出桌面可停止新的攻击。\n\n{pigs}\n基础锤伤害 1，电锯 2，砂轮 3；技能可叠加。\n护腕共振每局有次数上限，升级后强化效果。\n\n第 2、4、6、8、10 天收工时交租。余额不足则破产。\n收工后可买装备、学技能。完成全部账单即获胜。", 21, Text, true));
         Back(body, back);
     }
 }

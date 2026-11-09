@@ -23,7 +23,7 @@ static class Program
         Check(!run.TrySwing(new[] { tin }, out _, out _) && tin.Health == 3, "invalid phase cannot damage pigs");
         Check(run.TryBuy("Rim", 0).Status == PurchaseStatus.Closed && run.Wallet == 0, "closed shop preserves wallet");
         Check(run.BeginShift() && !run.BeginShift(), "begin is not repeatable during work");
-        Check(run.TrySwing(new[] { tin, tin }, out var first, out int coins) && tin.Health == 2 && coins == 0 && run.Stamina == 11, "one damage and one stamina for duplicate targets");
+        Check(run.TrySwing(new[] { tin, tin }, out var first, out int coins) && tin.Health == 2 && coins == 0 && run.Stamina == run.Capacity - 1, "one damage and one stamina for duplicate targets");
         int stamina = run.Stamina;
         Check(first!.IsSettled && typeof(GameSession).GetMethod("LandSwing") == null, "settlement is completed internally and has no public replay entry");
         run.TrySwing(new[] { tin }, out _, out _); run.TrySwing(new[] { tin }, out _, out coins);
@@ -48,7 +48,7 @@ static class Program
         before = run.Wallet;
         Check(run.TryBuy("Rim", 0).Status == PurchaseStatus.StaleOffer && run.Wallet == before, "stale double click does not debit twice");
         int previousStamina = run.Stamina;
-        Check(run.TryBuy("Stamina", 0).Succeeded && run.Capacity == 13 && run.Stamina == previousStamina, "capacity upgrade does not refill current day");
+        Check(run.TryBuy("Stamina", 0).Succeeded && run.Capacity == BalanceContent.Tuning.StartingStamina + 1 && run.Stamina == previousStamina, "capacity upgrade does not refill current day");
         Check(run.TryLearn("wide").Succeeded && run.TryLearn("power1").Succeeded && run.Damage == 2, "skill prerequisites unlock damage upgrade");
         before = run.Wallet; Check(!run.TryLearn("wide").Succeeded && run.Wallet == before, "skill cannot be bought twice");
         run.BeginShift(); Check(run.Stamina == run.Capacity, "new day refills upgraded capacity");
@@ -67,7 +67,7 @@ static class Program
         Check(run.Phase == ShiftPhase.Won && run.PaidBills == 5 && run.NextBill == null, "ten-day victory");
         before = run.Wallet; Check(run.BeginShift() && run.IsEndless && run.Shift == 11, "endless preserves successful run");
         run.CloseShift(); Check(run.Wallet == before && run.Phase == ShiftPhase.Shopping, "endless has no extra bill");
-        var reset = DefaultGame.CreateSession(); Check(reset.Wallet == 0 && reset.Damage == 1 && reset.Capacity == 12 && !reset.IsEndless, "restart state is clean");
+        var reset = DefaultGame.CreateSession(); Check(reset.Wallet == 0 && reset.Damage == 1 && reset.Capacity == BalanceContent.Tuning.StartingStamina && !reset.IsEndless, "restart state is clean");
         var contract = new RentContract(new[] { new Bill(2, 10), new Bill(4, 20) });
         Check(contract.Settle(1, 100).Paid == 0 && contract.PaidCount == 0, "rent cannot be collected early");
         Check(contract.Settle(2, 9).Shortfall == 1 && contract.PaidCount == 0, "failed rent preserves outstanding bill");
@@ -90,10 +90,12 @@ static class Program
         configured.BeginShift(); configured.TrySwing(new[] { Pig() }, out _, out _); configured.CloseShift();
         IShop shop = configured;
         Check(shop.GetOffers().Count == 1 && shop.GetOffers()[0].Product.Id == "gloves", "shop lists injected catalogue through interface");
-        Check(shop.TryBuy("gloves", 0).Succeeded && configured.Capacity == 15, "new data variant uses unchanged purchase workflow");
+        Check(shop.TryBuy("gloves", 0).Succeeded && configured.Capacity == BalanceContent.Tuning.StartingStamina + 3, "new data variant uses unchanged purchase workflow");
         ArchitectureChecks.Run(Check);
         PigVariantChecks.Run(Check);
         SolidExtensionChecks.Run(Check);
+        GameplayControlChecks.Run(Check);
+        EquipmentChecks.Run(Check);
         Console.WriteLine($"PASS: {_checks} core checks. No Godot runtime required.");
     }
 }

@@ -78,7 +78,7 @@ public partial class WorkshopHud : Control
             _ledger.Text = $"租金 ¥{bill.Amount} · {due}  [B]";
         }
         else _ledger.Text = "租金已缴清 · 查看  [B]";
-        _hint.Text = $"锤击伤害 {state.Damage} · 移动鼠标瞄准，自动挥锤";
+        _hint.Text = $"{state.WeaponName} Lv.{state.WeaponLevel} · 伤害 {state.Damage} · 耗能 {state.AttackCost} · 自动攻击";
     }
 
     public void Notify(string text) => _hint.Text = text;
@@ -98,6 +98,11 @@ public partial class WorkshopHud : Control
         _impact.Show();
     }
 
+    public void ShowEffect(Func<Vector2> anchor, EffectOutcome effect)
+    {
+        ShowImpact(anchor, effect.Strike, effect.Coins);
+        _impact.Text = effect.Name + "\n" + _impact.Text;
+    }
     public void PulseWallet()
     {
         if (!IsVisibleInTree()) return;

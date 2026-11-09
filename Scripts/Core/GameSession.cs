@@ -5,7 +5,7 @@ public enum ShiftPhase { Ready, Working, Choosing, Shopping, Won, Bankrupt }
 public sealed record ShiftReceipt(int Shift, int OpeningCash, int Earnings, int Due, int Paid, int Shortfall, int Pigs);
 
 /// <summary>协调一局的回合、体力和钱包；合法命令交给伤害、账单和成长对象处理。</summary>
-public sealed class GameSession : IShop, ISkillTree, ISessionView
+public sealed class GameSession : IShop, ISkillTree, ISessionView, IWeaponLoadout, IEquipmentStatusView
 {
     private readonly PerkProgress _perks;
     private readonly SwingRewards _rewards;
@@ -32,10 +32,36 @@ public sealed class GameSession : IShop, ISkillTree, ISessionView
     public int Wallet { get; private set; }
     public int ShiftEarnings { get; private set; }
     public int Stamina { get; private set; }
-    public Bonus TotalBonus => _inventory.TotalBonus.Add(_skills.TotalBonus).Add(_perks.TotalBonus);
+    public Bonus TotalBonus => _inventory.TotalBonus.Add(_inventory.EquippedBonus).Add(_skills.TotalBonus).Add(_perks.TotalBonus);
+    public WeaponLoadout EquippedWeapon
+    {
+        get
+        {
+            var product = _inventory.EquippedProduct;
+            int level = product == null ? 0 : _inventory.Level(product.Id);
+            return new(product?.Weapon ?? _definition.StartingWeapon, level,
+                product?.TierAt(level - 1).Palette ?? ShopProduct.StandardPalette, product?.Id);
+        }
+    }
+    public AttackStats AttackStats
+    {
+        get
+        {
+            var stats = EquippedWeapon.Weapon.Attack.Stats(_definition.Tuning, TotalBonus);
+            if (stats.Damage <= 0 || stats.StaminaCost <= 0 || !float.IsFinite(stats.Radius) || stats.Radius <= 0)
+                throw new InvalidOperationException("Weapon strategies must return positive finite attack values.");
+            return stats;
+        }
+    }
+    public int StaminaCost => AttackStats.StaminaCost;
+    public bool CanAttack => Stamina >= StaminaCost;
+    public IReadOnlyList<CombatEffectDefinition> ActiveEffects => _inventory.ActiveEffects;
+    public EquipmentTier? EquippedAccessory => _inventory.AccessoryTier;
+    public SwingTiming AttackTiming(SwingTiming baseline) => EquippedWeapon.Weapon.Attack.Timing(baseline);
+    public IReadOnlyList<PigState> Targets(PigHerd herd, System.Numerics.Vector2 point) => EquippedWeapon.Weapon.Attack.Targets(herd, point, AttackStats);
     public int ContractLength => _definition.ContractLength;
-    public float Radius => _definition.Tuning.BaseRadius + ExtraRadius;
-    public int Damage => checked(_definition.Tuning.BaseDamage + TotalBonus.Damage);
+    public float Radius => AttackStats.Radius;
+    public int Damage => AttackStats.Damage;
     public int ShiftPigs { get; private set; }
     public float RecoveryReduction => TotalBonus.Recovery;
     public int PaidBills => _contract.PaidCount;
@@ -67,15 +93,25 @@ public sealed class GameSession : IShop, ISkillTree, ISessionView
     {
         strike = null;
         coins = 0;
-        if (Phase != ShiftPhase.Working || Stamina <= 0) return false;
-        var prepared = StrikeResolver.Prepare(targets, Damage);
-        var quote = _rewards.Prepare(prepared, TotalBonus);
+        if (Phase != ShiftPhase.Working || !CanAttack) return false;
+        return ResolveStrike(targets, Damage, StaminaCost, out strike, out coins);
+    }
+    internal bool ApplyEffect(EffectPulse pulse, out SwingResult? strike, out int coins)
+    {
+        strike = null; coins = 0;
+        if (Phase != ShiftPhase.Working) return false;
+        return ResolveStrike(pulse.Targets, pulse.Damage, 0, out strike, out coins);
+    }
+    private bool ResolveStrike(IEnumerable<PigState> targets, int damage, int staminaSpent, out SwingResult? strike, out int coins)
+    {
+        var prepared = StrikeResolver.Prepare(targets, damage);
+        var quote = _rewards.Prepare(prepared, TotalBonus, staminaSpent);
         int nextWallet = checked(Wallet + quote.Payout.Coins);
         int nextEarnings = checked(ShiftEarnings + quote.Payout.Coins);
-        int nextStamina = checked(Stamina - 1 + quote.Payout.StaminaRefund);
+        int nextStamina = checked(Stamina - staminaSpent + quote.Payout.StaminaRefund);
         int nextPigs = checked(ShiftPigs + prepared.DestroyedCount);
         // Validate every extension before committing health, budgets, counters or money.
-        StrikeResolver.Apply(prepared, Damage);
+        StrikeResolver.Apply(prepared, damage);
         _rewards.Commit(quote);
         prepared.MarkSettled();
         Wallet = nextWallet; ShiftEarnings = nextEarnings; Stamina = nextStamina; ShiftPigs = nextPigs;
@@ -126,5 +162,7 @@ public sealed class GameSession : IShop, ISkillTree, ISessionView
         if (result.Succeeded) Wallet -= result.CashSpent;
         return result;
     }
+    public EquipResult TryEquip(string productId) => Phase == ShiftPhase.Shopping
+        ? _inventory.TryEquip(productId) : new(EquipStatus.Closed);
 }
 

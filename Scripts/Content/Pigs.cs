@@ -3,7 +3,7 @@ public static class PigContent
     public static PigRoster Roster { get; } = new(new[]
     {
         new PigArchetype(new("ceramic", "普通陶瓷猪", 1, 1, 2, "陶瓷"),
-            new(), HerdLayout.Middle(1), HerdLayout.Middle(-1)),
+            new(), HerdLayout.Middle(1), HerdLayout.Middle(-1), HerdLayout.Back(-1), HerdLayout.Front(1)),
         new PigArchetype(new("tin", "铁皮储金猪", .65f, 3, 6, "铁皮"),
             new(Body3D: "738b92", Body2D: "7b8a83", Nose2D: "9eaca2", Scale: 1.12f, Interior: "a5afb0", Metal: true),
             HerdLayout.Back(1)),
