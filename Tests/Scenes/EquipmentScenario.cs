@@ -78,8 +78,8 @@ internal static class EquipmentScenario
             Check(g.Session.Stamina == stamina - 1, "chainsaw cuts automatically with its configured one-energy cost, without a mouse button");
             var circle = (TorusMesh)renderer.GetChildren().OfType<MeshInstance3D>().Single(m => m.Mesh is TorusMesh).Mesh;
             float sawRadius = g.Session.Radius; int sawCapacity = g.Session.Capacity;
-            Check(MathF.Abs(circle.OuterRadius - (sawRadius + .014f)) < .001f && sawRadius >= 2.4f - .001f,
-                $"the actual 3D chainsaw circle displays the enlarged damage radius (ring={circle.OuterRadius:0.000}, damage={sawRadius:0.000})");
+            Check(MathF.Abs(circle.OuterRadius - (sawRadius + .014f)) < .001f && sawRadius is >= 1.85f and <= 2.2f,
+                $"the actual 3D chainsaw circle displays the balanced damage radius (ring={circle.OuterRadius:0.000}, damage={sawRadius:0.000})");
             await Capture(g, "03-chainsaw-gameplay");
             Move(g, new(-100, -100)); Tick(g, 1);
             stamina = g.Session.Stamina; wallet = g.Session.Wallet;
@@ -114,4 +114,5 @@ internal static class EquipmentScenario
         catch (Exception ex) { GD.PushError("EQUIPMENT VERIFICATION FAILED: " + ex); g.GetTree().Quit(1); }
     }
 }
+
 

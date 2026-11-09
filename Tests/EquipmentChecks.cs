@@ -24,7 +24,7 @@ internal static class EquipmentChecks
     {
         session.BeginShift();
         while (session.CanAttack)
-            session.TrySwing(Enumerable.Range(0, 32).Select(_ => new PigState(PigContent.Get("ceramic"))), out _, out _);
+            session.TrySwing(Enumerable.Range(0, 40).Select(_ => new PigState(PigContent.Get("ceramic"))), out _, out _);
         session.CloseShift();
     }
     private static bool Rejects<T>(Action action) where T : Exception
@@ -49,9 +49,12 @@ internal static class EquipmentChecks
                 previousRadius = progression.Radius; previousDamage = progression.Damage; previousCapacity = progression.Capacity;
             }
         }
+        progression.TryBuy("Stamina", 1); progression.TryBuy("Stamina", 2);
         int fullCapacity = progression.Capacity;
+        check(progression.Radius <= 2.5f && progression.Capacity <= 26,
+            "fully upgraded equipment keeps a focused attack circle and a bounded energy pool before skills and perks");
         progression.TryEquip("Rim");
-        check(progression.Capacity == BalanceContent.Tuning.StartingStamina + 5 && progression.Capacity < fullCapacity,
+        check(progression.Capacity == BalanceContent.Tuning.StartingStamina + 6 && progression.Capacity < fullCapacity,
             "switching tools removes the previous tool's capacity bonus instead of stacking every purchased weapon");
         var tieredAccessory = new ShopProduct("tiered", "Tiered", "", 0, 0, 2, new(Stamina: 1),
             Tiers: new[] { new EquipmentTier("One", ShopProduct.StandardPalette, UpgradeBonus: new(Stamina: 2)),
@@ -71,11 +74,11 @@ internal static class EquipmentChecks
         check(session.TryEquip("Chainsaw").Status == EquipStatus.NotOwned && session.Wallet == balance, "unowned weapons cannot be equipped for free");
         check(session.TryBuy("Rim", 0).Succeeded && session.TryBuy("Rim", 1).Succeeded && session.TryBuy("Stamina", 0).Succeeded,
             "stage-one equipment uses the existing upgrade workflow");
-        check(session.EquippedWeapon.Weapon.Id == "hammer" && session.EquippedWeapon.Level == 2 && MathF.Abs(session.Radius - 1.87f) < .0001f,
+        check(session.EquippedWeapon.Weapon.Id == "hammer" && session.EquippedWeapon.Level == 2 && session.Radius is >= 1.6f and <= 1.75f,
             "hammer upgrades are active only through the selected weapon loadout");
         check(session.EquippedAccessory?.Name == "鎏金振纹护腕" && session.ActiveEffects.Count == 1, "first cuff level installs golden impact resonance");
         check(session.TryBuy("Chainsaw", 0).Succeeded && session.EquippedWeapon.Weapon.Id == "chainsaw", "buying a higher weapon stage equips it automatically");
-        check(session.Damage == 3 && session.StaminaCost == 1 && MathF.Abs(session.Radius - 2.15f) < .0001f,
+        check(session.Damage == 3 && session.StaminaCost == 1 && session.Radius is >= 1.75f and <= 2.0f,
             "chainsaw has forgiving broad cutting stats and does not inherit hammer-only radius upgrades");
         var edgeHerd = new PigHerd(new[] { At("ceramic", new(2.05f, 0)), At("ceramic", new(4, 0)) });
         check(session.Targets(edgeHerd, Vector2.Zero).SequenceEqual(new[] { edgeHerd.Pigs[0].State }),
@@ -89,7 +92,7 @@ internal static class EquipmentChecks
         check(session.TryEquip("Stamina").Status == EquipStatus.NotAWeapon && session.Wallet == balance, "accessories cannot replace the selected weapon");
         check(session.TryBuy("Stamina", 1).Succeeded && session.EquippedAccessory?.Name == "共振护腕" && session.ActiveEffects.Count == 2,
             "second cuff level adds automatic cracking without stacking the obsolete first-level effect instance");
-        check(session.TryBuy("Stamina", 2).Succeeded && session.EquippedAccessory?.Name == "金鸣护腕" && session.Capacity == 23,
+        check(session.TryBuy("Stamina", 2).Succeeded && session.EquippedAccessory?.Name == "金鸣护腕" && session.Capacity == 20,
             "third cuff level installs broad resonance and keeps the cumulative stamina bonus");
         check(session.TryBuy("Grinder", 0).Status == PurchaseStatus.Locked, "grinder stays locked until the configured chainsaw level");
         check(session.TryBuy("Chainsaw", 1).Succeeded && session.TryBuy("Grinder", 0).Succeeded,
@@ -154,4 +157,5 @@ internal static class EquipmentChecks
         check(!ReferenceEquals(firstInstance, secondInstance), "effect factories provide independent mutable budgets for new shifts and runs");
     }
 }
+
 

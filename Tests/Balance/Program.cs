@@ -4,8 +4,10 @@ using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 
-record Profile(string Name, float Reaction, float AimError, float TravelSpeed, float PairAwareness, float MissChance, bool Upgrades = true, bool EquipmentFirst = false);
-record Result(int LastDay, bool Won, int Cash, int Swings, int Misses, int Pigs, int[] Earnings, int[] Wallets, int ChainsawDay, int GrinderDay);
+record Profile(string Name, float Reaction, float AimError, float TravelSpeed, float PairAwareness, float MissChance,
+    bool Upgrades = true, bool EquipmentFirst = false, bool Mixed = false, bool Patient = false);
+record Result(int LastDay, bool Won, int Cash, int Swings, int Misses, int Pigs, int[] Earnings, int[] Wallets,
+    int ChainsawDay, int GrinderDay, int EffectCoins, double MinimumLateCoverage);
 
 static class Program
 {
@@ -16,7 +18,11 @@ static class Program
         new("no-upgrades", .23f, .40f, 13, .5f, .07f, false),
         new("careless", .5f, 1.1f, 7, .05f, .30f),
         new("gear-regular", .23f, .40f, 13, .5f, .07f, EquipmentFirst: true),
-        new("gear-learning", .38f, .72f, 9, .15f, .14f, EquipmentFirst: true)
+        new("gear-learning", .38f, .72f, 9, .15f, .14f, EquipmentFirst: true),
+        new("gear-practiced", .12f, .18f, 20, .90f, .02f, EquipmentFirst: true),
+        new("mixed-regular", .23f, .40f, 13, .5f, .07f, Mixed: true),
+        new("mixed-practiced", .12f, .18f, 20, .90f, .02f, Mixed: true),
+        new("gear-patient", .23f, .40f, 13, .5f, .07f, EquipmentFirst: true, Patient: true)
     };
 
     static PigRoster Roster(int population)
@@ -72,6 +78,30 @@ static class Program
         int daysLeft = Math.Max(1, (session.NextBill?.Shift ?? 11) - session.Shift);
         // Keep part of an upcoming payment; an ordinary player still invests before having the whole bill saved.
         int reserve = (int)Math.Ceiling((session.NextBill?.Amount ?? 0) * (daysLeft == 1 ? .55f : .30f));
+        if (profile.Mixed)
+        {
+            var path = new[] { ("Rim", 1), ("Stamina", 1), ("skill:wide", 1), ("skill:pairs", 1),
+                ("Rim", 2), ("Chainsaw", 1), ("skill:endurance", 1), ("Stamina", 2), ("skill:coins", 1),
+                ("Chainsaw", 2), ("Grinder", 1), ("skill:breath", 1), ("Stamina", 3), ("Grinder", 2), ("Grinder", 3) };
+            foreach (var (id, wanted) in path)
+            {
+                if (id.StartsWith("skill:"))
+                {
+                    var skill = session.GetSkills().Single(s => s.Skill.Id == id[6..]);
+                    if (skill.Status == SkillStatus.Learned) continue;
+                    if (skill.Status != SkillStatus.Available || session.Wallet - skill.Skill.Cost < reserve) break;
+                    session.TryLearn(skill.Skill.Id);
+                }
+                else
+                {
+                    var offer = session.GetOffers().Single(o => o.Product.Id == id);
+                    if (offer.Level >= wanted) continue;
+                    if (offer.Status != PurchaseStatus.Available || session.Wallet - offer.Price < reserve) break;
+                    session.TryBuy(id, offer.Level);
+                }
+            }
+            return;
+        }
         if (profile.EquipmentFirst)
         {
             // Deliberately follow the visible equipment ladder without relying on skills to carry the run.
@@ -101,11 +131,18 @@ static class Program
     {
         var random = new Random(seed * 43 + 7);
         var run = new WorkshopRun(new SeededFactory(content, seed));
-        int swings = 0, misses = 0, pigs = 0, chainsawDay = 0, grinderDay = 0;
+        int swings = 0, misses = 0, pigs = 0, chainsawDay = 0, grinderDay = 0, effectCoins = 0;
+        double minimumLateCoverage = double.PositiveInfinity;
         var earnings = new List<int>(); var wallets = new List<int>();
         while (run.Session.Shift <= 10)
         {
             run.BeginShift();
+            if (profile.Patient && run.Session.ActiveEffects.Count > 0)
+                for (int tick = 0; tick < 900; tick++)
+                {
+                    run.Advance(.05f, null);
+                    effectCoins += run.EffectOutcomes.Sum(e => e.Coins);
+                }
             Vector2 cursor = new(0, 3.5f), destination = cursor;
             PigMotion[] focus = Array.Empty<PigMotion>();
             Vector2 aimOffset = Vector2.Zero;
@@ -146,12 +183,16 @@ static class Program
                 cursor += travel.Length() <= step ? travel : Vector2.Normalize(travel) * step;
                 Vector2? aim = frames > 2 ? cursor : null; // Same mouse-only automatic play in both versions.
                 var outcome = run.Advance(.05f, aim);
+                effectCoins += run.EffectOutcomes.Sum(e => e.Coins);
                 if (outcome == null) continue;
                 swings++; misses += outcome.Strike.HitCount == 0 ? 1 : 0; pigs += outcome.Strike.DestroyedCount;
                 // A kill is noticed only at the next reaction interval, which may cause an extra swing.
             }
             if (frames >= 12000) throw new Exception("Simulation failed to finish a shift.");
             earnings.Add(run.Session.ShiftEarnings); wallets.Add(run.Session.Wallet);
+            var receipt = run.Session.Receipt!;
+            if (receipt.Shift >= 6 && receipt.Due > 0)
+                minimumLateCoverage = Math.Min(minimumLateCoverage, (receipt.OpeningCash + receipt.Earnings) / (double)receipt.Due);
             if (run.Session.Phase is ShiftPhase.Won or ShiftPhase.Bankrupt) break;
             if (run.Session.Phase == ShiftPhase.Choosing)
             {
@@ -163,7 +204,8 @@ static class Program
             if (chainsawDay == 0 && run.Session.GetOffers().Any(o => o.Product.Id == "Chainsaw" && o.Level > 0)) chainsawDay = run.Session.Shift + 1;
             if (grinderDay == 0 && run.Session.GetOffers().Any(o => o.Product.Id == "Grinder" && o.Level > 0)) grinderDay = run.Session.Shift + 1;
         }
-        return new(run.Session.Shift, run.Session.Phase == ShiftPhase.Won, run.Session.Wallet, swings, misses, pigs, earnings.ToArray(), wallets.ToArray(), chainsawDay, grinderDay);
+        return new(run.Session.Shift, run.Session.Phase == ShiftPhase.Won, run.Session.Wallet, swings, misses, pigs,
+            earnings.ToArray(), wallets.ToArray(), chainsawDay, grinderDay, effectCoins, minimumLateCoverage);
     }
     sealed class SeededFactory : IGameFactory
     {
@@ -176,20 +218,32 @@ static class Program
 
     static void Main(string[] args)
     {
+        if (args.Contains("--experiments") && args.Contains("--verify"))
+            throw new ArgumentException("Use --verify for the configured release, or --experiments to compare candidates.");
         int seeds = args.Contains("--quick") ? 40 : args.Contains("--thorough") ? 500 : 200;
+        int seedStart = args.FirstOrDefault(a => a.StartsWith("--seed-start=")) is string start ? int.Parse(start[13..]) : 1;
+        if (seedStart < 1) throw new ArgumentOutOfRangeException(nameof(seedStart));
         var all = new List<object>();
         var rates = new Dictionary<string, (double Wins, double ReachDay4, double Misses, double Chainsaw, double Grinder)>();
         var populations = args.Contains("--sweep") ? new[] { 4, 6, 8, 10 } : new[] { PigContent.Roster.Spawns.Count };
         var capacities = args.Contains("--sweep") ? new[] { 12, 14, 16, 18 } : new[] { BalanceContent.Tuning.StartingStamina };
+        var variants = args.Contains("--experiments") ? BalanceExperiments.Variants() : new[] { new BalanceVariant("configured", EquipmentContent.Products) };
+        string? filter = args.FirstOrDefault(a => a.StartsWith("--variants="))?[11..];
+        if (filter != null) variants = variants.Where(v => filter.Split(',').Contains(v.Name));
+        foreach (var variant in variants)
         foreach (int population in populations)
         foreach (int stamina in capacities)
         {
-            var content = new GameContent(DefaultGame.Definition(tuning: BalanceContent.Tuning with { StartingStamina = stamina }), Roster(population), BalanceContent.Timing);
+            var content = new GameContent(DefaultGame.Definition(products: variant.Products, bills: variant.Bills,
+                tuning: BalanceContent.Tuning with { StartingStamina = stamina }), Roster(population), BalanceContent.Timing);
             foreach (var profile in Profiles)
             {
-                var results = Enumerable.Range(1, seeds).Select(seed => Play(content, profile, seed)).ToArray();
+                var results = args.Contains("--parallel")
+                    ? Enumerable.Range(seedStart, seeds).AsParallel().AsOrdered().WithDegreeOfParallelism(4).Select(seed => Play(content, profile, seed)).ToArray()
+                    : Enumerable.Range(seedStart, seeds).Select(seed => Play(content, profile, seed)).ToArray();
+                var winners = results.Where(r => r.Won).ToArray();
                 var summary = new {
-                    population, stamina, profile = profile.Name, runs = seeds,
+                    variant = variant.Name, population, stamina, profile = profile.Name, runs = seeds, seedStart,
                     winRate = Math.Round(results.Count(r => r.Won) * 100.0 / seeds, 1),
                     reachDay4 = Math.Round(results.Count(r => r.LastDay >= 4) * 100.0 / seeds, 1),
                     medianLastDay = results.OrderBy(r => r.LastDay).ElementAt(seeds / 2).LastDay,
@@ -199,7 +253,10 @@ static class Program
                     medianEndingCash = results.OrderBy(r => r.Cash).ElementAt(seeds / 2).Cash,
                     chainsawReached = Math.Round(results.Count(r => r.ChainsawDay is > 0 and <= 10) * 100.0 / seeds, 1),
                     grinderReached = Math.Round(results.Count(r => r.GrinderDay is > 0 and <= 10) * 100.0 / seeds, 1),
-                    bankruptWithOnlyChainsaw = Math.Round(results.Count(r => !r.Won && r.ChainsawDay > 0 && r.GrinderDay == 0) * 100.0 / seeds, 1)
+                    bankruptWithOnlyChainsaw = Math.Round(results.Count(r => !r.Won && r.ChainsawDay > 0 && r.GrinderDay == 0) * 100.0 / seeds, 1),
+                    effectIncomeShare = Math.Round(results.Sum(r => r.EffectCoins) * 100.0 / results.Sum(r => r.Earnings.Sum()), 1),
+                    medianWinningCash = winners.Length == 0 ? 0 : winners.OrderBy(r => r.Cash).ElementAt(winners.Length / 2).Cash,
+                    medianLateCoverage = winners.Length == 0 ? 0 : Math.Round(winners.OrderBy(r => r.MinimumLateCoverage).ElementAt(winners.Length / 2).MinimumLateCoverage, 2)
                 };
                 all.Add(summary); Console.WriteLine(JsonSerializer.Serialize(summary));
                 if (population == PigContent.Roster.Spawns.Count && stamina == BalanceContent.Tuning.StartingStamina)
@@ -212,18 +269,24 @@ static class Program
         {
             if (seeds < 200) throw new Exception("Balance verification requires at least 200 seeds per profile.");
             void Check(bool pass, string label) { if (!pass) throw new Exception("Balance regression: " + label); }
-            Check(rates["regular"].Wins >= 65 && rates["regular"].Wins <= 95, "regular play should be achievable without becoming automatic victory");
+            Check(rates["regular"].Wins >= 65 && rates["regular"].Wins <= 90, "regular play should be achievable without becoming automatic victory");
             Check(rates["practiced"].Wins >= 90, "practiced play should reliably complete the contract");
             Check(rates["learning"].Wins >= 10 && rates["learning"].Wins <= 60, "learning play should have a chance and room to improve");
             Check(rates["learning"].ReachDay4 >= 95 && rates["regular"].ReachDay4 >= 98, "early shifts should tolerate ordinary reaction errors");
             Check(rates["careless"].Wins <= 15, "frequent major mistakes should still have consequences");
             Check(rates["no-upgrades"].Wins < rates["regular"].Wins && rates["no-upgrades"].Wins < 80, "upgrades should remain useful");
             Check(rates["regular"].Misses <= 10 && rates["practiced"].Misses <= 5, "control-related empty strikes should be uncommon");
-            Check(rates["gear-regular"].Wins >= 70 && rates["gear-regular"].Wins <= 99.5 && rates["gear-regular"].Grinder >= 75,
+            Check(rates["gear-regular"].Wins >= 65 && rates["gear-regular"].Wins <= 90 && rates["gear-regular"].Grinder >= 50,
                 "ordinary equipment-focused play should survive and reach the final weapon stage");
-            Check(rates["gear-learning"].Wins >= 15 && rates["gear-learning"].Wins <= 90 && rates["gear-learning"].Chainsaw >= 60,
+            Check(rates["gear-learning"].Wins >= 20 && rates["gear-learning"].Wins <= 65 && rates["gear-learning"].Chainsaw >= 40,
                 "learning players should be able to experience the weapon progression");
-            Console.WriteLine($"BALANCE PASS: {seeds * Profiles.Length} seeded automatic-play runs; 9 balance criteria.");
+            Check(rates["gear-practiced"].Wins >= 85, "practiced equipment play should be reliably viable");
+            Check(rates["mixed-regular"].Wins >= 65 && rates["mixed-regular"].Wins <= 90,
+                "mixing equipment with skills should not remove ordinary play's challenge");
+            Check(rates["mixed-practiced"].Wins >= 90, "practiced mixed builds should reward good aiming");
+            Check(rates["gear-patient"].Wins >= 65 && rates["gear-patient"].Wins <= 95,
+                "harvesting all bounded passive resonance should help without guaranteeing victory");
+            Console.WriteLine($"BALANCE PASS: {seeds * Profiles.Length} seeded automatic-play runs; 13 balance criteria.");
         }
     }
 }

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GameplayBalance")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b93ce290a8d32d6ba6e17e18db0890df7b979e60")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0ae510bbb5fc5875af33aca5e2c040bc2ae997da")]
 [assembly: System.Reflection.AssemblyProductAttribute("GameplayBalance")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GameplayBalance")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

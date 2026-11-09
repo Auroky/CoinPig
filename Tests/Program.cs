@@ -48,7 +48,7 @@ static class Program
         before = run.Wallet;
         Check(run.TryBuy("Rim", 0).Status == PurchaseStatus.StaleOffer && run.Wallet == before, "stale double click does not debit twice");
         int previousStamina = run.Stamina;
-        Check(run.TryBuy("Stamina", 0).Succeeded && run.Capacity == BalanceContent.Tuning.StartingStamina + 3 && run.Stamina == previousStamina, "capacity upgrade does not refill current day");
+        Check(run.TryBuy("Stamina", 0).Succeeded && run.Capacity == BalanceContent.Tuning.StartingStamina + 2 && run.Stamina == previousStamina, "capacity upgrade does not refill current day");
         Check(run.TryLearn("wide").Succeeded && run.TryLearn("power1").Succeeded && run.Damage == 2, "skill prerequisites unlock damage upgrade");
         before = run.Wallet; Check(!run.TryLearn("wide").Succeeded && run.Wallet == before, "skill cannot be bought twice");
         run.BeginShift(); Check(run.Stamina == run.Capacity, "new day refills upgraded capacity");
@@ -99,4 +99,5 @@ static class Program
         Console.WriteLine($"PASS: {_checks} core checks. No Godot runtime required.");
     }
 }
+
 
