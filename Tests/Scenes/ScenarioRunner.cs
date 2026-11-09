@@ -145,16 +145,16 @@ internal static class ScenarioRunner
                     Press(g, "Next"); await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame); continue;
                 }
                 var visible = g.Herd.Pigs.Where(p => p.Active).ToArray();
-                Vector2 bestPoint = new(466, 406); float bestScore = -1;
-                var candidates = visible.Select(g.Bench.ScreenPosition).Concat(visible.SelectMany(a => visible.Select(b => (g.Bench.ScreenPosition(a) + g.Bench.ScreenPosition(b)) / 2)));
+                System.Numerics.Vector2 bestPoint = default; float bestScore = -1;
+                var candidates = visible.Select(p => p.Position).Concat(visible.SelectMany(a => visible.Select(b => (a.Position + b.Position) / 2)));
                 foreach (var point in candidates)
                 {
                     // Allow room for the pigs to keep moving during the windup.
-                    var hits = visible.Where(p => g.Bench.ScreenPosition(p).DistanceTo(point) <= (g.Bench.Radius - .4f) * g.Bench.UnitScale).Select(p => p.State);
+                    var hits = visible.Where(p => System.Numerics.Vector2.Distance(p.Position, point) <= g.Bench.Radius - .4f).Select(p => p.State);
                     float score = hits.Sum(p => p.Definition.Coins / (float)Math.Ceiling(p.Health / (float)g.Session.Damage));
                     if (score > bestScore) { bestScore = score; bestPoint = point; }
                 }
-                MovePointer(g, bestScore >= 4 ? bestPoint : new Vector2(-100, -100));
+                MovePointer(g, bestScore >= 4 ? g.Bench.ScreenPosition(bestPoint) : new Vector2(-100, -100));
                 g._Process(.05); totalFrames++;
             }
             Check(g.Session.Phase == ShiftPhase.Won && g.Session.PaidBills == 5, "normal aiming bot completes ten-day contract");

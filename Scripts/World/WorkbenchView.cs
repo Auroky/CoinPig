@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 /// <summary>Maps world-space pigs to the workbench and draws the aiming tool.</summary>
-public partial class WorkbenchView : Node2D
+public partial class WorkbenchView : Node2D, IWorkbench
 {
     private IReadOnlyList<PigMotion> _pigs = Array.Empty<PigMotion>();
     public Vector2 Aim { get; set; }
@@ -44,11 +44,13 @@ public partial class WorkbenchView : Node2D
         QueueRedraw();
     }
 
-    public Vector2 ScreenPosition(PigMotion pig) => Origin + new Vector2(pig.Position.X, pig.Position.Y) * UnitScale;
-    public System.Numerics.Vector2 WorldPosition(Vector2 screenPoint)
+    public Vector2 ScreenPosition(PigMotion pig) => ScreenPosition(pig.Position);
+    public Vector2 ScreenPosition(System.Numerics.Vector2 point) => Origin + new Vector2(point.X, point.Y) * UnitScale;
+    public bool TryWorldPosition(Vector2 screenPoint, out System.Numerics.Vector2 worldPoint)
     {
         Vector2 local = (screenPoint - Origin) / UnitScale;
-        return new(local.X, local.Y);
+        worldPoint = new(local.X, local.Y);
+        return PlayArea.HasPoint(screenPoint);
     }
 
     public void Tick(float delta)
@@ -58,7 +60,7 @@ public partial class WorkbenchView : Node2D
         QueueRedraw();
     }
 
-    public void Impact(Vector2 point, SwingResult strike, int coins)
+    public void Impact(System.Numerics.Vector2 point, SwingResult strike, int coins)
     {
         foreach (var hit in strike.Targets)
         {
@@ -66,8 +68,10 @@ public partial class WorkbenchView : Node2D
             var pig = _pigs.First(p => ReferenceEquals(p.State, hit.Pig));
             if (hit.Result.Destroyed) _effects.Break(ScreenPosition(pig), PigPainter.Look(hit.Pig.Definition.Id).Body);
         }
-        _effects.Strike(point, Radius * UnitScale, strike.DestroyedCount, strike.HitCount, coins);
+        _effects.Strike(ScreenPosition(point), Radius * UnitScale, strike.DestroyedCount, strike.HitCount, coins);
     }
+
+    public void Present() => QueueRedraw();
 
     public override void _Draw()
     {
