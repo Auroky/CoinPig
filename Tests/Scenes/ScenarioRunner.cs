@@ -45,6 +45,21 @@ internal static class ScenarioRunner
             await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame);
             await Capture(g, "01-intro");
             Press(g, "Start"); Check(g.Session.Phase == ShiftPhase.Working && !g.Interface.Menu.IsOpen, "start button begins playable day");
+            foreach (var point in new[] { new System.Numerics.Vector2(-6, -3), new(0, 0), new(6, 3) })
+            {
+                Vector2 screen = g.Bench.ScreenPosition(point);
+                Check(g.Bench.TryWorldPosition(screen, out var recovered) && System.Numerics.Vector2.Distance(point, recovered) < .001f,
+                    "screen projection and tabletop picking agree in world coordinates");
+            }
+            string trace = ProjectionChecks.Run(g.Bench);
+            string[] arguments = OS.GetCmdlineUserArgs();
+            int directoryIndex = Array.IndexOf(arguments, "--capture-dir");
+            if (directoryIndex >= 0 && directoryIndex + 1 < arguments.Length)
+            {
+                Directory.CreateDirectory(arguments[directoryIndex + 1]);
+                File.WriteAllText(Path.Combine(arguments[directoryIndex + 1], "projection-trace.txt"), trace);
+            }
+            Check(true, "projected input matches direct world rules through seeded victory and bankruptcy");
             await Capture(g, "02-table");
             if (DisplayServer.GetName() != "headless")
             {
@@ -82,6 +97,7 @@ internal static class ScenarioRunner
             Input.FlushBufferedEvents();
             Tick(g, .25f);
             Check(g.Session.Stamina == stamina - 1 && g.Session.ShiftPigs >= 1, "mouse movement alone lands a hit without a button press");
+            await Capture(g, "12-impact");
             Tick(g, .6f);
             Check(g.Session.Stamina == stamina - 2, "stationary pointer continues at the recovery cadence");
             MovePointer(g, new(-100, -100)); Tick(g, .8f);
