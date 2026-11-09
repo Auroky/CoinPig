@@ -21,9 +21,9 @@ internal static class ProjectionChecks
                 while (direct.Stamina > 0 && frames++ < 20000)
                 {
                     firstHerd.Advance(.05f); secondHerd.Advance(.05f);
-                    Vector2 target = paired ? (firstHerd.Pigs[0].Position + firstHerd.Pigs[1].Position) / 2 : new(0, 3.6f);
+                    Vector2 target = paired ? (firstHerd.Pigs[0].Position + firstHerd.Pigs[1].Position) / 2 : new(7.3f, 3.7f);
                     float radius = 1.43f + direct.ExtraRadius;
-                    if (paired && firstHerd.Pigs.Any(p => !p.Active || Vector2.Distance(p.Position, target) > radius - .4f)) continue;
+                    if (paired && firstHerd.Pigs.Take(2).Any(p => !p.Active || Vector2.Distance(p.Position, target) > radius - .4f)) continue;
                     if (!surface.TryWorldPosition(surface.ScreenPosition(target), out var recovered))
                         throw new Exception("A reachable world target could not be picked through the view.");
                     direct.TrySwing(firstHerd.Targets(target, radius), out var first, out int a);

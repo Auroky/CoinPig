@@ -9,8 +9,12 @@ static class Program
     static void Earn(GameSession run)
     {
         int safety = 0;
+        var targets = Enumerable.Range(0, 8).Select(_ => Pig("swift")).ToArray();
         while (run.Stamina > 0 && safety++ < 80)
-            run.TrySwing(Enumerable.Range(0, 8).Select(_ => Pig("swift")), out _, out _);
+        {
+            foreach (var target in targets.Where(p => !p.IsAlive)) target.Respawn();
+            run.TrySwing(targets, out _, out _);
+        }
         Check(safety < 80, "finite stamina even with refunds");
     }
     static void Main()
@@ -70,7 +74,9 @@ static class Program
         Check(contract.Settle(2, 10).Paid == 10 && contract.PaidCount == 1, "exact rent advances bill");
         Check(contract.Settle(2, 100).Paid == 0 && contract.PaidCount == 1, "same bill cannot be collected twice");
         var herd = new PigHerd(HerdLayout.Initial);
-        Check(herd.Pigs.Count == 2 && herd.Pigs.All(p => p.State.Definition.Id == "ceramic"), "default herd contains exactly two ordinary pigs");
+        Check(herd.Pigs.Count == 4 && herd.Pigs.Count(p => p.State.Definition.Id == "ceramic") == 2 &&
+            herd.Pigs.Count(p => p.State.Definition.Id == "tin") == 1 && herd.Pigs.Count(p => p.State.Definition.Id == "swift") == 1,
+            "default herd contains two ordinary pigs, one heavy pig and one swift pig");
         var at = herd.Pigs[0].Position;
         herd.Advance(.2f);
         Check(herd.Pigs[0].Position != at, "world movement runs without a rendering engine");
@@ -87,6 +93,7 @@ static class Program
         Check(shop.GetOffers().Count == 1 && shop.GetOffers()[0].Product.Id == "gloves", "shop lists injected catalogue through interface");
         Check(shop.TryBuy("gloves", 0).Succeeded && configured.Capacity == 15, "new data variant uses unchanged purchase workflow");
         ArchitectureChecks.Run(Check);
+        PigVariantChecks.Run(Check);
         Console.WriteLine($"PASS: {_checks} core checks. No Godot runtime required.");
     }
 }

@@ -89,7 +89,9 @@ internal static class ScenarioRunner
                 Check(g.GetWindow().Mode == Window.ModeEnum.Fullscreen, "F11 restores fullscreen");
                 Press(g, "Resume");
             }
-            Check(g.Herd.Pigs.Count == 2 && g.Herd.Pigs.All(p => p.State.Definition.Id == "ceramic"), "starts with two ordinary pigs");
+            Check(g.Herd.Pigs.Count == 4 && g.Herd.Pigs.Count(p => p.State.Definition.Id == "ceramic") == 2 &&
+                g.Herd.Pigs.Count(p => p.State.Definition.Id == "tin") == 1 && g.Herd.Pigs.Count(p => p.State.Definition.Id == "swift") == 1,
+                "starts with two ordinary pigs, one heavy pig and one swift pig");
             int arrivals = 0;
             if (g.Bench is IRewardFeedback rewardFeedback) rewardFeedback.CoinCollected += () => arrivals++;
             int stamina = g.Session.Stamina;

@@ -10,7 +10,9 @@ public static class HerdLayout
     public static IReadOnlyList<PigSpawn> Initial { get; } = Array.AsReadOnly(new[]
     {
         new PigSpawn(PigCatalog.Get("ceramic"), Middle(1)),
-        new PigSpawn(PigCatalog.Get("ceramic"), Middle(-1))
+        new PigSpawn(PigCatalog.Get("ceramic"), Middle(-1)),
+        new PigSpawn(PigCatalog.Get("tin"), Back(1)),
+        new PigSpawn(PigCatalog.Get("swift"), Front(-1))
     });
 
     private static void ValidateSide(float side)

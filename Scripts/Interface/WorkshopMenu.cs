@@ -342,8 +342,10 @@ public partial class WorkshopMenu : Control
 
     private void ShowHelp(Action back)
     {
-        var body = Open(MenuPage.Help, "玩法", "", new(780, 560), back);
-        body.AddChild(Label("移动鼠标瞄准，锤子会自动连续挥动，无需点击。\n空锤也消耗体力；将鼠标移出桌面可停止新的挥锤。\n\n初始有两只普通陶瓷猪：1 点耐久，击碎获得 ¥2。\n它们会不断重生，交汇时可以一锤击碎两只。\n\n第 2、4、6、8、10 天收工时交租。余额不足则破产。\n收工后可买装备、学技能。完成全部账单即获胜。", 21, Text, true));
+        var body = Open(MenuPage.Help, "玩法", "", new(780, 620), back);
+        string pigs = string.Join("\n", PigCatalog.All.Select(pig =>
+            $"{pig.Name}：{pig.MaxHealth} 点耐久，速度 ×{pig.Speed:0.##}，击碎 ¥{pig.Coins}。"));
+        body.AddChild(Label($"移动鼠标瞄准，锤子会自动连续挥动，无需点击。\n空锤也消耗体力；将鼠标移出桌面可停止新的挥锤。\n\n{pigs}\n基础锤击每次造成 1 点伤害。击碎后会不断重生。\n\n第 2、4、6、8、10 天收工时交租。余额不足则破产。\n收工后可买装备、学技能。完成全部账单即获胜。", 21, Text, true));
         Back(body, back);
     }
 }
