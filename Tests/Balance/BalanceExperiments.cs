@@ -2,13 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-internal sealed record BalanceVariant(string Name, IReadOnlyList<ShopProduct> Products, IReadOnlyList<Bill>? Bills = null);
+internal sealed record BalanceVariant(string Name, IReadOnlyList<ShopProduct> Products, IReadOnlyList<Bill>? Bills = null,
+    IReadOnlyList<SkillDefinition>? Skills = null);
 internal static class BalanceExperiments
 {
     private static IReadOnlyList<Bill> PreviousBills => new[] { new Bill(2, 28), new(4, 56), new(6, 84), new(8, 115), new(10, 136) };
+    private static IReadOnlyList<SkillDefinition> PreviousSkills => SkillContent.Nodes.Select(s =>
+        s.Id is "breath" or "reserve" ? s with { Bonus = s.Bonus with { Stamina = 2 } } : s).ToArray();
     public static IEnumerable<BalanceVariant> Variants()
     {
-        yield return new("previous", PreviousProducts(), PreviousBills);
+        yield return new("previous", PreviousProducts(), PreviousBills, PreviousSkills);
         yield return Make("reach-only", reach: true);
         yield return Make("stamina-only", stamina: true);
         yield return Make("resonance-only", resonance: true);
@@ -77,7 +80,7 @@ internal static class BalanceExperiments
             if (resonance && p.Id == "Stamina") result = result with { Tiers = p.Tiers!.Select((t, i) => t with { Effects = Effects(i) }).ToArray() };
             return result;
         }).ToArray();
-        return new(name, products, PreviousBills);
+        return new(name, products, PreviousBills, PreviousSkills);
     }
     private static IReadOnlyList<CombatEffectDefinition> Effects(int tier) => tier switch
     {

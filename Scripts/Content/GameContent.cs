@@ -31,9 +31,11 @@ public static class DefaultGame
     public static SessionDefinition Definition(IReadOnlyList<ShopProduct>? products = null,
         IReadOnlyList<SkillDefinition>? skills = null, IReadOnlyList<PerkCard>? perks = null,
         IReadOnlyList<Bill>? bills = null, GameTuning? tuning = null,
-        IReadOnlyList<ISwingRewardRule>? rewardRules = null, WeaponDefinition? startingWeapon = null) =>
+        IReadOnlyList<ISwingRewardRule>? rewardRules = null, WeaponDefinition? startingWeapon = null,
+        IRentContinuation? rentContinuation = null) =>
         new(tuning ?? BalanceContent.Tuning, bills ?? BalanceContent.Bills, products ?? EquipmentContent.Products,
-            skills ?? SkillContent.Nodes, perks ?? PerkContent.Cards, rewardRules ?? RewardRules, startingWeapon ?? EquipmentContent.Hammer);
+            skills ?? SkillContent.Nodes, perks ?? PerkContent.Cards, rewardRules ?? RewardRules, startingWeapon ?? EquipmentContent.Hammer,
+            rentContinuation ?? (bills == null ? BalanceContent.Renewal : null));
 
     public static GameSession CreateSession(Random? random = null, IReadOnlyList<ShopProduct>? products = null,
         IReadOnlyList<SkillDefinition>? skills = null, IReadOnlyList<PerkCard>? perks = null) =>

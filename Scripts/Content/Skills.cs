@@ -15,11 +15,12 @@ public static class SkillContent
         new("power1", "重击练习 I", "伤害 +1，铁皮猪从三锤变成两锤", "wide", SkillContent.Heavy, 1, 22, new(Damage: 1)),
         new("power2", "重击练习 II", "伤害再 +1，满耐久铁皮猪也可一锤击碎", "power1", SkillContent.Heavy, 2, 80, new(Damage: 1)),
         new("endurance", "耐力练习", "每局体力上限 +1", null, SkillContent.Stamina, 0, 8, new(Stamina: 1)),
-        new("breath", "呼吸节奏", "每局体力上限再 +2", "endurance", SkillContent.Stamina, 1, 24, new(Stamina: 2)),
-        new("reserve", "充沛精力", "每局体力上限再 +2", "breath", SkillContent.Stamina, 2, 36, new(Stamina: 2)),
+        new("breath", "呼吸节奏", "每局体力上限再 +1", "endurance", SkillContent.Stamina, 1, 24, new(Stamina: 1)),
+        new("reserve", "充沛精力", "每局体力上限再 +1", "breath", SkillContent.Stamina, 2, 36, new(Stamina: 1)),
         new("pairs", "双响红利", "每次一锤至少击碎两只，额外赚 ¥1", null, SkillContent.Income, 0, 10, new(PairCoins: 1)),
         new("coins", "收集习惯", "每只击碎的猪额外掉落 ¥1", "pairs", SkillContent.Income, 1, 52, new(PigCoins: 1)),
         new("jackpot", "满堂彩", "每次一锤至少击碎三只，额外赚 ¥4", "coins", SkillContent.Income, 2, 36, new(TripleCoins: 4))
     });
 }
+
 

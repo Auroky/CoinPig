@@ -52,7 +52,7 @@ static class Program
         Check(run.TryLearn("wide").Succeeded && run.TryLearn("power1").Succeeded && run.Damage == 2, "skill prerequisites unlock damage upgrade");
         before = run.Wallet; Check(!run.TryLearn("wide").Succeeded && run.Wallet == before, "skill cannot be bought twice");
         run.BeginShift(); Check(run.Stamina == run.Capacity, "new day refills upgraded capacity");
-        for (int day = 2; day <= 10; day++)
+        for (int day = 2; day <= run.ContractLength; day++)
         {
             Earn(run); run.CloseShift();
             Check(run.Phase != ShiftPhase.Bankrupt, "funded run survives rent");
@@ -62,11 +62,11 @@ static class Program
                 Check(run.Offers.Count > 0 && run.Offers.All(x => !run.Has(x.Id)), "offers exclude owned perks");
                 var pick = run.Offers[0].Id; Check(run.Choose(pick) && !run.Choose(pick), "perk picked once");
             }
-            if (day < 10) Check(run.BeginShift(), "next day starts");
+            if (day < run.ContractLength) Check(run.BeginShift(), "next day starts");
         }
-        Check(run.Phase == ShiftPhase.Won && run.PaidBills == 5 && run.NextBill == null, "ten-day victory");
-        before = run.Wallet; Check(run.BeginShift() && run.IsEndless && run.Shift == 11, "endless preserves successful run");
-        run.CloseShift(); Check(run.Wallet == before && run.Phase == ShiftPhase.Shopping, "endless has no extra bill");
+        Check(run.Phase == ShiftPhase.Won && run.PaidBills == BalanceContent.Bills.Count && run.NextBill?.Shift == run.ContractLength + 2, "full contract victory keeps the renewal bill visible");
+        before = run.Wallet; Check(run.BeginShift() && run.IsEndless && run.Shift == run.ContractLength + 1, "endless preserves successful run");
+        run.CloseShift(); Check(run.Wallet == before && run.Phase == ShiftPhase.Shopping, "renewal rest day does not charge before the next due date");
         var reset = DefaultGame.CreateSession(); Check(reset.Wallet == 0 && reset.Damage == 1 && reset.Capacity == BalanceContent.Tuning.StartingStamina && !reset.IsEndless, "restart state is clean");
         var contract = new RentContract(new[] { new Bill(2, 10), new Bill(4, 20) });
         Check(contract.Settle(1, 100).Paid == 0 && contract.PaidCount == 0, "rent cannot be collected early");
@@ -96,8 +96,10 @@ static class Program
         SolidExtensionChecks.Run(Check);
         GameplayControlChecks.Run(Check);
         EquipmentChecks.Run(Check);
+        LeaseChecks.Run(Check);
         Console.WriteLine($"PASS: {_checks} core checks. No Godot runtime required.");
     }
 }
+
 
 

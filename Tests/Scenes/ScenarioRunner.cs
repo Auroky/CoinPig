@@ -41,6 +41,9 @@ internal static class ScenarioRunner
         {
             if (!control.IsVisibleInTree() || (control is not Button && control is not Label)) continue;
             var rect = control.GetGlobalRect();
+            for (var ancestor = control.GetParent(); ancestor != null; ancestor = ancestor.GetParent())
+                if (ancestor is Control clip && clip.ClipContents) rect = rect.Intersection(clip.GetGlobalRect());
+            if (!rect.HasArea()) continue;
             if (rect.Position.X < -1 || rect.Position.Y < -1 || rect.End.X > bounds.End.X + 1 || rect.End.Y > bounds.End.Y + 1)
                 throw new Exception($"Control outside viewport in {name}: {control.Name} {rect}");
         }
@@ -192,7 +195,7 @@ internal static class ScenarioRunner
                     // Keep the next payment covered and favour income for a small herd.
                     GD.Print($"DAY {g.Session.Shift}: income {g.Session.ShiftEarnings}, wallet {g.Session.Wallet}");
                     int reserve = g.Session.NextBill?.Amount ?? 0;
-                    foreach (string id in new[] { "pairs", "coins", "endurance", "breath", "wide", "reserve" })
+                    foreach (string id in new[] { "pairs", "coins", "endurance", "breath", "wide", "reserve", "jackpot", "quick", "rebound" })
                     {
                         var skill = g.Session.GetSkills().First(s => s.Skill.Id == id);
                         if (skill.Status != SkillStatus.Available || g.Session.Wallet - skill.Skill.Cost < reserve) continue;
@@ -215,10 +218,32 @@ internal static class ScenarioRunner
                 MovePointer(g, bestScore >= 4 ? g.Bench.ScreenPosition(bestPoint) : new Vector2(-100, -100));
                 g._Process(.05); totalFrames++;
             }
-            Check(g.Session.Phase == ShiftPhase.Won && g.Session.PaidBills == 5, "normal aiming bot completes ten-day contract");
+            Check(g.Session.Phase == ShiftPhase.Won && g.Session.PaidBills == g.Content.Definition.Bills.Count, "normal aiming bot completes the full configured contract");
             await Capture(g, "07-victory");
-            Press(g, "Next"); Check(g.Session.IsEndless && g.Session.Shift == 11, "victory continues into endless mode");
+            Press(g, "Next"); Check(g.Session.IsEndless && g.Session.Shift == g.Session.ContractLength + 1, "victory continues into endless mode");
+            Check(g.Session.NextBill != null && g.Session.NextBill.Shift > g.Session.ContractLength,
+                "continued play has a real upcoming renewal bill instead of a cleared ledger");
             Press(g, "Ledger"); await Capture(g, "08-rent"); Press(g, "Back");
+            var renewal = g.Session.NextBill!;
+            Press(g, "EndDay"); Press(g, "ConfirmEnd");
+            Check(g.Session.Receipt!.Paid == 0 && g.Session.Phase == ShiftPhase.Shopping,
+                "first renewal rest day does not charge ahead of its due date");
+            Press(g, "Next"); int renewalBalance = g.Session.Wallet;
+            Press(g, "EndDay"); Press(g, "ConfirmEnd");
+            Check(g.Session.Receipt!.Due == renewal.Amount &&
+                (renewalBalance >= renewal.Amount ? g.Session.Receipt.Paid == renewal.Amount : g.Session.Receipt.Shortfall == renewal.Amount - renewalBalance),
+                "actual renewal scene charges the configured bill or reports its exact shortfall");
+            Check(g.Session.Phase != ShiftPhase.Won, "renewal payment cannot loop back into a free victory state");
+            g.Interface.Menu.ShowLedger(SessionSnapshot.From(g.Session), () => g.Interface.Menu.ShowReceipt(SessionSnapshot.From(g.Session)));
+            await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame);
+            await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame);
+            var rentScroll = g.Interface.FindChildren("RentScroll", "ScrollContainer", true, false).OfType<ScrollContainer>().First(s => s.IsVisibleInTree());
+            Check(rentScroll.Size.X > 400 && rentScroll.GetVScrollBar().MaxValue > rentScroll.Size.Y && g.Session.GetRentSchedule().Any(r => r.Renewal),
+                $"long rent ledger scrolls and includes generated renewal bills (content={rentScroll.GetVScrollBar().MaxValue}, viewport={rentScroll.Size.Y})");
+            Check(rentScroll.FindChildren("*", "Label", true, false).OfType<Label>().Any(label =>
+                label.Text.Contains("续租") && label.GetGlobalRect().Intersects(rentScroll.GetGlobalRect())),
+                "the ledger opens with upcoming renewal rows actually visible inside the scroll viewport");
+            await Capture(g, "09-renewal-ledger"); Press(g, "Back");
             await PresentationExtensionChecks.Run(g, Check);
             GD.Print($"VERIFICATION PASS: {_checks} checks; {totalFrames} simulated frames; wallet {g.Session.Wallet}.");
             g.GetTree().Quit(0);
@@ -226,3 +251,4 @@ internal static class ScenarioRunner
         catch (Exception ex) { GD.PushError("VERIFICATION FAILED: " + ex); g.GetTree().Quit(1); }
     }
 }
+

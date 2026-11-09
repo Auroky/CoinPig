@@ -67,7 +67,7 @@ public partial class WorkshopHud : Control
 
     public void Refresh(SessionSnapshot state)
     {
-        string day = state.Endless ? $"无尽 {state.Day} 局" : $"第 {state.Day}/{state.ContractLength} 局";
+        string day = state.Endless ? $"续租 {state.Day} 局" : $"第 {state.Day}/{state.ContractLength} 局";
         _round.Text = $"{day}   体力 {state.Stamina} / {state.Capacity}";
         _wallet.Text = $"余额  ¥{state.Wallet}";
         _score.Text = $"击碎 {_lastBroken} 只   /   最佳 {_bestBroken} 只";

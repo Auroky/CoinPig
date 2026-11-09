@@ -21,7 +21,7 @@ public sealed class GameSession : IShop, ISkillTree, ISessionView, IWeaponLoadou
         _perks = new PerkProgress(definition.Perks, random ?? new Random());
         _skills = new SkillProgress(definition.Skills);
         _inventory = new ShopInventory(definition.Products);
-        _contract = new RentContract(definition.Bills);
+        _contract = new RentContract(definition.Bills, definition.RentContinuation);
         _rewards = new SwingRewards(definition.RewardRules);
         Stamina = definition.Tuning.StartingStamina;
     }
@@ -133,7 +133,7 @@ public sealed class GameSession : IShop, ISkillTree, ISessionView, IWeaponLoadou
         if (missing > 0) { Phase = ShiftPhase.Bankrupt; return; }
         if (_contract.PaidCount == previouslyPaid) { Phase = ShiftPhase.Shopping; return; }
 
-        if (NextBill == null) { Phase = ShiftPhase.Won; return; }
+        if (_contract.ContractPaid && !IsEndless) { Phase = ShiftPhase.Won; return; }
         _perks.OfferChoices();
         Phase = Offers.Count > 0 ? ShiftPhase.Choosing : ShiftPhase.Shopping;
     }

@@ -17,11 +17,12 @@ public sealed class SessionDefinition
     public IReadOnlyList<PerkCard> Perks { get; }
     public IReadOnlyList<ISwingRewardRule> RewardRules { get; }
     public WeaponDefinition StartingWeapon { get; }
+    public IRentContinuation? RentContinuation { get; }
     public int ContractLength => Bills.Count == 0 ? 0 : Bills[^1].Shift;
 
     public SessionDefinition(GameTuning tuning, IEnumerable<Bill> bills, IEnumerable<ShopProduct> products,
         IEnumerable<SkillDefinition> skills, IEnumerable<PerkCard> perks, IEnumerable<ISwingRewardRule> rewardRules,
-        WeaponDefinition startingWeapon)
+        WeaponDefinition startingWeapon, IRentContinuation? rentContinuation = null)
     {
         ArgumentNullException.ThrowIfNull(tuning);
         if (tuning.StartingStamina <= 0 || tuning.BaseDamage <= 0 ||
@@ -32,9 +33,10 @@ public sealed class SessionDefinition
         if (startingWeapon.Attack == null || string.IsNullOrWhiteSpace(startingWeapon.Id))
             throw new ArgumentException("A starting weapon needs an identity and behavior.", nameof(startingWeapon));
         StartingWeapon = startingWeapon;
+        RentContinuation = rentContinuation;
         Bills = Snapshot(bills); Products = Snapshot(products); Skills = Snapshot(skills);
         Perks = Snapshot(perks); RewardRules = Snapshot(rewardRules);
-        _ = new RentContract(Bills); _ = new ShopInventory(Products);
+        _ = new RentContract(Bills, RentContinuation); _ = new ShopInventory(Products);
         _ = new SkillProgress(Skills); _ = new PerkProgress(Perks, new Random(0));
         _ = new SwingRewards(RewardRules);
     }

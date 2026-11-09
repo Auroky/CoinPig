@@ -10,9 +10,10 @@ internal static class ProjectionChecks
         var trace = new List<string>();
         foreach (bool paired in new[] { true, false })
         {
-            var direct = DefaultGame.CreateSession(new Random(4702));
-            var projected = DefaultGame.CreateSession(new Random(4702));
-            for (int day = 1; day <= 10; day++)
+            var definition = DefaultGame.Definition(bills: BalanceContent.Bills.Take(5).ToArray());
+            var direct = new GameSession(definition, new Random(4702));
+            var projected = new GameSession(definition, new Random(4702));
+            for (int day = 1; day <= definition.ContractLength; day++)
             {
                 direct.BeginShift(); projected.BeginShift();
                 var firstHerd = new PigHerd(PigContent.Roster.Spawns);

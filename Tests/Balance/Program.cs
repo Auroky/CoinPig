@@ -7,7 +7,7 @@ using System.Text.Json;
 record Profile(string Name, float Reaction, float AimError, float TravelSpeed, float PairAwareness, float MissChance,
     bool Upgrades = true, bool EquipmentFirst = false, bool Mixed = false, bool Patient = false);
 record Result(int LastDay, bool Won, int Cash, int Swings, int Misses, int Pigs, int[] Earnings, int[] Wallets,
-    int ChainsawDay, int GrinderDay, int EffectCoins, double MinimumLateCoverage);
+    int ChainsawDay, int GrinderDay, int EffectCoins, double MinimumLateCoverage, int[] Capacities, int BuildCompletedDay);
 
 static class Program
 {
@@ -22,6 +22,7 @@ static class Program
         new("gear-practiced", .12f, .18f, 20, .90f, .02f, EquipmentFirst: true),
         new("mixed-regular", .23f, .40f, 13, .5f, .07f, Mixed: true),
         new("mixed-practiced", .12f, .18f, 20, .90f, .02f, Mixed: true),
+        new("mixed-learning", .38f, .72f, 9, .15f, .14f, Mixed: true),
         new("gear-patient", .23f, .40f, 13, .5f, .07f, EquipmentFirst: true, Patient: true)
     };
 
@@ -75,7 +76,7 @@ static class Program
     static void Shop(GameSession session, Profile profile)
     {
         if (!profile.Upgrades) return;
-        int daysLeft = Math.Max(1, (session.NextBill?.Shift ?? 11) - session.Shift);
+        int daysLeft = Math.Max(1, (session.NextBill?.Shift ?? session.ContractLength + 1) - session.Shift);
         // Keep part of an upcoming payment; an ordinary player still invests before having the whole bill saved.
         int reserve = (int)Math.Ceiling((session.NextBill?.Amount ?? 0) * (daysLeft == 1 ? .55f : .30f));
         if (profile.Mixed)
@@ -99,6 +100,16 @@ static class Program
                     if (offer.Status != PurchaseStatus.Available || session.Wallet - offer.Price < reserve) break;
                     session.TryBuy(id, offer.Level);
                 }
+            }
+            // Once the main build is affordable, keep investing in the remaining skills and collection.
+            if (session.GetOffers().Single(o => o.Product.Id == "Grinder").Level == 3)
+            {
+                foreach (var skill in session.GetSkills())
+                    if (skill.Status == SkillStatus.Available && session.Wallet - skill.Skill.Cost >= reserve)
+                        session.TryLearn(skill.Skill.Id);
+                foreach (var offer in session.GetOffers().OrderBy(o => o.Price))
+                    if (offer.Status == PurchaseStatus.Available && session.Wallet - offer.Price >= reserve)
+                        session.TryBuy(offer.Product.Id, offer.Level);
             }
             return;
         }
@@ -131,12 +142,13 @@ static class Program
     {
         var random = new Random(seed * 43 + 7);
         var run = new WorkshopRun(new SeededFactory(content, seed));
-        int swings = 0, misses = 0, pigs = 0, chainsawDay = 0, grinderDay = 0, effectCoins = 0;
+        int swings = 0, misses = 0, pigs = 0, chainsawDay = 0, grinderDay = 0, effectCoins = 0, buildCompletedDay = 0;
         double minimumLateCoverage = double.PositiveInfinity;
-        var earnings = new List<int>(); var wallets = new List<int>();
-        while (run.Session.Shift <= 10)
+        var earnings = new List<int>(); var wallets = new List<int>(); var capacities = new List<int>();
+        while (run.Session.Shift <= run.Session.ContractLength)
         {
             run.BeginShift();
+            capacities.Add(run.Session.Capacity);
             if (profile.Patient && run.Session.ActiveEffects.Count > 0)
                 for (int tick = 0; tick < 900; tick++)
                 {
@@ -203,9 +215,11 @@ static class Program
             Shop(run.Session, profile);
             if (chainsawDay == 0 && run.Session.GetOffers().Any(o => o.Product.Id == "Chainsaw" && o.Level > 0)) chainsawDay = run.Session.Shift + 1;
             if (grinderDay == 0 && run.Session.GetOffers().Any(o => o.Product.Id == "Grinder" && o.Level > 0)) grinderDay = run.Session.Shift + 1;
+            if (buildCompletedDay == 0 && run.Session.GetOffers().All(o => o.Status == PurchaseStatus.SoldOut) &&
+                run.Session.GetSkills().All(s => s.Status == SkillStatus.Learned)) buildCompletedDay = run.Session.Shift + 1;
         }
         return new(run.Session.Shift, run.Session.Phase == ShiftPhase.Won, run.Session.Wallet, swings, misses, pigs,
-            earnings.ToArray(), wallets.ToArray(), chainsawDay, grinderDay, effectCoins, minimumLateCoverage);
+            earnings.ToArray(), wallets.ToArray(), chainsawDay, grinderDay, effectCoins, minimumLateCoverage, capacities.ToArray(), buildCompletedDay);
     }
     sealed class SeededFactory : IGameFactory
     {
@@ -218,34 +232,43 @@ static class Program
 
     static void Main(string[] args)
     {
-        if (args.Contains("--experiments") && args.Contains("--verify"))
+        if ((args.Contains("--experiments") || args.Contains("--lease-experiments")) && args.Contains("--verify"))
             throw new ArgumentException("Use --verify for the configured release, or --experiments to compare candidates.");
         int seeds = args.Contains("--quick") ? 40 : args.Contains("--thorough") ? 500 : 200;
         int seedStart = args.FirstOrDefault(a => a.StartsWith("--seed-start=")) is string start ? int.Parse(start[13..]) : 1;
         if (seedStart < 1) throw new ArgumentOutOfRangeException(nameof(seedStart));
+        var profileFilter = args.FirstOrDefault(a => a.StartsWith("--profiles="))?[11..];
+        if (profileFilter != null && args.Contains("--verify")) throw new ArgumentException("Verification requires all player profiles.");
+        var profiles = profileFilter == null ? Profiles : Profiles.Where(p => profileFilter.Split(',').Contains(p.Name)).ToArray();
         var all = new List<object>();
         var rates = new Dictionary<string, (double Wins, double ReachDay4, double Misses, double Chainsaw, double Grinder)>();
+        var samples = new Dictionary<string, Result[]>();
         var populations = args.Contains("--sweep") ? new[] { 4, 6, 8, 10 } : new[] { PigContent.Roster.Spawns.Count };
         var capacities = args.Contains("--sweep") ? new[] { 12, 14, 16, 18 } : new[] { BalanceContent.Tuning.StartingStamina };
         var variants = args.Contains("--experiments") ? BalanceExperiments.Variants() : new[] { new BalanceVariant("configured", EquipmentContent.Products) };
+        if (args.Contains("--lease-experiments")) variants = LeaseExperiments.Variants();
         string? filter = args.FirstOrDefault(a => a.StartsWith("--variants="))?[11..];
         if (filter != null) variants = variants.Where(v => filter.Split(',').Contains(v.Name));
         foreach (var variant in variants)
         foreach (int population in populations)
         foreach (int stamina in capacities)
         {
-            var content = new GameContent(DefaultGame.Definition(products: variant.Products, bills: variant.Bills,
+            var content = new GameContent(DefaultGame.Definition(products: variant.Products, bills: variant.Bills, skills: variant.Skills,
                 tuning: BalanceContent.Tuning with { StartingStamina = stamina }), Roster(population), BalanceContent.Timing);
-            foreach (var profile in Profiles)
+            foreach (var profile in profiles)
             {
                 var results = args.Contains("--parallel")
                     ? Enumerable.Range(seedStart, seeds).AsParallel().AsOrdered().WithDegreeOfParallelism(4).Select(seed => Play(content, profile, seed)).ToArray()
                     : Enumerable.Range(seedStart, seeds).Select(seed => Play(content, profile, seed)).ToArray();
                 var winners = results.Where(r => r.Won).ToArray();
+                samples[profile.Name] = results;
+                var lateIncome = results.Where(r => r.Earnings.Length >= 20).SelectMany(r => r.Earnings.Skip(19)).ToArray();
                 var summary = new {
                     variant = variant.Name, population, stamina, profile = profile.Name, runs = seeds, seedStart,
                     winRate = Math.Round(results.Count(r => r.Won) * 100.0 / seeds, 1),
                     reachDay4 = Math.Round(results.Count(r => r.LastDay >= 4) * 100.0 / seeds, 1),
+                    reachDay11 = Math.Round(results.Count(r => r.LastDay >= 11) * 100.0 / seeds, 1),
+                    reachDay20 = Math.Round(results.Count(r => r.LastDay >= 20) * 100.0 / seeds, 1),
                     medianLastDay = results.OrderBy(r => r.LastDay).ElementAt(seeds / 2).LastDay,
                     day1Income = Math.Round(results.Average(r => r.Earnings[0]), 1),
                     incomePerSwing = Math.Round(results.Sum(r => r.Earnings.Sum()) / (double)results.Sum(r => r.Swings), 2),
@@ -256,7 +279,13 @@ static class Program
                     bankruptWithOnlyChainsaw = Math.Round(results.Count(r => !r.Won && r.ChainsawDay > 0 && r.GrinderDay == 0) * 100.0 / seeds, 1),
                     effectIncomeShare = Math.Round(results.Sum(r => r.EffectCoins) * 100.0 / results.Sum(r => r.Earnings.Sum()), 1),
                     medianWinningCash = winners.Length == 0 ? 0 : winners.OrderBy(r => r.Cash).ElementAt(winners.Length / 2).Cash,
-                    medianLateCoverage = winners.Length == 0 ? 0 : Math.Round(winners.OrderBy(r => r.MinimumLateCoverage).ElementAt(winners.Length / 2).MinimumLateCoverage, 2)
+                    medianLateCoverage = winners.Length == 0 ? 0 : Math.Round(winners.OrderBy(r => r.MinimumLateCoverage).ElementAt(winners.Length / 2).MinimumLateCoverage, 2),
+                    lateDailyIncome = lateIncome.Length == 0 ? 0 : Math.Round(lateIncome.Average(), 1),
+                    finalRent = content.Definition.Bills.Last().Amount,
+                    completedBuildRate = Math.Round(results.Count(r => r.BuildCompletedDay > 0) * 100.0 / seeds, 1),
+                    medianBuildDay = results.All(r => r.BuildCompletedDay == 0) ? 0 : results.Where(r => r.BuildCompletedDay > 0)
+                        .OrderBy(r => r.BuildCompletedDay).ElementAt(results.Count(r => r.BuildCompletedDay > 0) / 2).BuildCompletedDay,
+                    meanPeakStamina = Math.Round(results.Average(r => r.Capacities.Max()), 1)
                 };
                 all.Add(summary); Console.WriteLine(JsonSerializer.Serialize(summary));
                 if (population == PigContent.Roster.Spawns.Count && stamina == BalanceContent.Tuning.StartingStamina)
@@ -268,7 +297,38 @@ static class Program
         if (args.Contains("--verify"))
         {
             if (seeds < 200) throw new Exception("Balance verification requires at least 200 seeds per profile.");
-            void Check(bool pass, string label) { if (!pass) throw new Exception("Balance regression: " + label); }
+            int checks = 0;
+            void Check(bool pass, string label) { if (!pass) throw new Exception("Balance regression: " + label); checks++; }
+            if (DefaultGame.Content.Definition.ContractLength >= 30)
+            {
+                double Reach(string name, int day) => samples[name].Count(r => r.LastDay >= day) * 100.0 / seeds;
+                var mixedWins = samples["mixed-regular"].Where(r => r.Won).OrderBy(r => r.Cash).ToArray();
+                var builds = samples["mixed-regular"].Where(r => r.BuildCompletedDay > 0).OrderBy(r => r.BuildCompletedDay).ToArray();
+                Check(rates["regular"].Wins is >= 30 and <= 65, "skill-first thirty-day play remains viable and challenging");
+                Check(rates["practiced"].Wins >= 50, "practiced skill-first builds retain a viable path");
+                Check(rates["mixed-regular"].Wins is >= 40 and <= 75, "ordinary mixed builds have a fair thirty-day chance");
+                Check(rates["mixed-practiced"].Wins >= 75, "practiced mixed builds can reliably finish the longer campaign");
+                Check(rates["mixed-learning"].Wins is >= 10 and <= 40,
+                    "learning players using both equipment and skills retain a meaningful thirty-day chance");
+                Check(rates["learning"].ReachDay4 >= 95 && rates["regular"].ReachDay4 >= 98, "opening days stay forgiving");
+                Check(Reach("regular", 11) >= 65 && Reach("mixed-regular", 11) >= 75 && Reach("gear-regular", 11) >= 75,
+                    "the original ten-day opening remains viable before the lease grows");
+                Check(Reach("mixed-regular", 20) >= 65 && Reach("mixed-practiced", 20) >= 90,
+                    "players have enough time to develop the late build");
+                Check(builds.Length * 100.0 / seeds >= 60 && builds[builds.Length / 2].BuildCompletedDay <= 22,
+                    "most ordinary mixed builds can complete their purchases before the last stretch");
+                Check(mixedWins.Length > 0 && mixedWins[mixedWins.Length / 2].Cash <= 1200,
+                    "finishing a fully upgraded campaign does not routinely leave several thousand idle coins");
+                Check(Reach("gear-regular", 20) >= 60 && Reach("gear-practiced", 20) >= 85,
+                    "equipment builds survive long enough to benefit from stamina and further investments");
+                Check(rates["no-upgrades"].Wins < rates["mixed-regular"].Wins && rates["no-upgrades"].Wins <= 10,
+                    "long leases make upgrades economically useful");
+                Check(rates["careless"].Wins <= 10, "large repeated aiming mistakes retain consequences");
+                Check(rates["regular"].Misses <= 10 && rates["practiced"].Misses <= 5, "longer leases do not worsen input accuracy");
+                Check(rates["gear-patient"].Wins <= rates["mixed-regular"].Wins, "passive waiting does not replace a developed build");
+                Console.WriteLine($"CAMPAIGN BALANCE PASS: {seeds * Profiles.Length} seeded runs; {checks} criteria; {DefaultGame.Content.Definition.ContractLength} shifts.");
+                return;
+            }
             Check(rates["regular"].Wins >= 65 && rates["regular"].Wins <= 90, "regular play should be achievable without becoming automatic victory");
             Check(rates["practiced"].Wins >= 90, "practiced play should reliably complete the contract");
             Check(rates["learning"].Wins >= 10 && rates["learning"].Wins <= 60, "learning play should have a chance and room to improve");
@@ -286,7 +346,7 @@ static class Program
             Check(rates["mixed-practiced"].Wins >= 90, "practiced mixed builds should reward good aiming");
             Check(rates["gear-patient"].Wins >= 65 && rates["gear-patient"].Wins <= 95,
                 "harvesting all bounded passive resonance should help without guaranteeing victory");
-            Console.WriteLine($"BALANCE PASS: {seeds * Profiles.Length} seeded automatic-play runs; 13 balance criteria.");
+            Console.WriteLine($"BALANCE PASS: {seeds * Profiles.Length} seeded automatic-play runs; {checks} balance criteria.");
         }
     }
 }

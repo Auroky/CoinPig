@@ -60,6 +60,8 @@ public partial class WorkshopMenu : Control
         AddChild(_panel);
         _panel.Resized += Arrange;
         _body = Column(_panel, 18);
+        // Wrapped text can initially report a tall minimum before the container receives its width.
+        _body.MinimumSizeChanged += () => Callable.From(Arrange).CallDeferred();
         var title = Label(heading, _titleLayout ? 46 : 36, Brass);
         title.HorizontalAlignment = HorizontalAlignment.Center;
         _body.AddChild(title);
@@ -129,14 +131,18 @@ public partial class WorkshopMenu : Control
         var receipt = state.Receipt!;
         bool failed = state.Phase == ShiftPhase.Bankrupt;
         bool complete = state.Phase == ShiftPhase.Won;
-        string title = failed ? "租约终止" : complete ? "账单已清" : $"第 {state.Day} 天 · 结算";
-        var body = Open(MenuPage.Receipt, title, failed ? $"本期租金还差 ¥{receipt.Shortfall}" : complete ? "十天租约完成" : "今日营业结束", new(600, 570));
+        string title = failed ? "租约终止" : complete ? "本期租约完成" : $"第 {state.Day} 天 · 结算";
+        var body = Open(MenuPage.Receipt, title, failed ? $"本期租金还差 ¥{receipt.Shortfall}" : complete
+            ? $"{state.ContractLength} 关租约完成 · 可继续接受涨租挑战" : "今日营业结束", new(600, 640));
+        body.AddThemeConstantOverride("separation", 12);
         Rule(body);
         AddLedgerLine(body, "击碎", $"{receipt.Pigs} 只");
         AddLedgerLine(body, "收入", $"+ ¥{receipt.Earnings}");
         AddLedgerLine(body, "租金", $"− ¥{receipt.Paid}");
         Rule(body);
         AddLedgerLine(body, "余额", $"¥ {state.Wallet}", 30);
+        if (!failed && state.NextBill is Bill next)
+            body.AddChild(Label($"下次租金：第 {next.Shift} 天 ¥{next.Amount} · 还需准备 ¥{Math.Max(0, next.Amount - state.Wallet)}", 18, Muted, true));
         if (!failed && !complete)
         {
             var row = Row(body);
@@ -146,17 +152,18 @@ public partial class WorkshopMenu : Control
             row.AddChild(shop);
             row.AddChild(skills);
         }
-        if (!failed) body.AddChild(Button(complete ? "继续经营" : "开始下一天", () => Start?.Invoke(), "Next", true));
+        if (!failed) body.AddChild(Button(complete ? "续租并继续经营" : "开始下一天", () => Start?.Invoke(), "Next", true));
         if (failed || complete) body.AddChild(Button("重新开始", () => Restart?.Invoke(), "Restart", failed));
     }
 
-    private static void AddLedgerLine(Control parent, string label, string value, int size = 23)
+    private static HBoxContainer AddLedgerLine(Control parent, string label, string value, int size = 23)
     {
         var row = Row(parent);
         var left = Label(label, size, Muted);
         left.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         row.AddChild(left);
         row.AddChild(Label(value, size));
+        return row;
     }
 
     public void ShowEquipment(IShopView shop, SessionSnapshot state) => ShowGallery(shop, null, state);
@@ -290,8 +297,21 @@ public partial class WorkshopMenu : Control
         Action returnToPrevious = back ?? (() => Resume?.Invoke());
         var body = Open(MenuPage.Ledger, "租约", $"余额 ¥{state.Wallet}", new(650, 600), returnToPrevious);
         Rule(body);
+        if (state.NextBill is Bill next)
+            body.AddChild(Label($"下次：第 {next.Shift} 天 ¥{next.Amount} · 当前缺口 ¥{Math.Max(0, next.Amount - state.Wallet)}", 20, Brass, true));
+        var scroll = new ScrollContainer { Name = "RentScroll", CustomMinimumSize = new(0, 285), CustomMaximumSize = new(-1, 285),
+            SizeFlagsVertical = SizeFlags.Fill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+            VerticalScrollMode = ScrollContainer.ScrollMode.Auto };
+        body.AddChild(scroll);
+        var rows = Column(scroll, 8); rows.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        Control? upcoming = null;
         foreach (var due in state.Schedule)
-            AddLedgerLine(body, $"第 {due.Day} 天  ·  ¥{due.Amount}", GameText.Deadline(due));
+        {
+            var line = AddLedgerLine(rows, $"{(due.Renewal ? "续租 " : "")}第 {due.Day} 天  ·  ¥{due.Amount}", GameText.Deadline(due));
+            if (!due.Paid && upcoming == null) upcoming = line;
+        }
+        if (upcoming != null) Callable.From(() => { if (GodotObject.IsInstanceValid(scroll)) scroll.EnsureControlVisible(upcoming); }).CallDeferred();
+        body.AddChild(Label("完成正式租约后可续租，后续租金继续增长。", 17, Muted, true));
         Rule(body);
         Back(body, returnToPrevious, back == null ? "返回营业" : "返回工坊");
     }
@@ -325,9 +345,10 @@ public partial class WorkshopMenu : Control
         var body = Open(MenuPage.Help, "玩法", "", new(780, 620), back);
         string pigs = string.Join("\n", PigDefinitions.Select(pig =>
             $"{pig.Name}：{pig.MaxHealth} 点耐久，速度 ×{pig.Speed:0.##}，击碎 ¥{pig.Coins}。"));
-        body.AddChild(Label($"移动鼠标瞄准，工具会自动连续攻击，无需点击。\n开局有准备时间，瞄准猪后才开始；快速换目标会短暂缓攻。\n空击也消耗体力；将鼠标移出桌面可停止新的攻击。\n\n{pigs}\n工具升级会提高伤害、范围和体力，技能可叠加。\n当前商店的工具每次攻击均耗能 1。\n护腕共振每局有次数上限，升级后强化效果。\n\n第 2、4、6、8、10 天收工时交租。余额不足则破产。\n收工后可买装备、学技能。完成全部账单即获胜。", 21, Text, true));
+        body.AddChild(Label($"移动鼠标瞄准，工具会自动连续攻击，无需点击。\n开局有准备时间，瞄准猪后才开始；快速换目标会短暂缓攻。\n空击也消耗体力；将鼠标移出桌面可停止新的攻击。\n\n{pigs}\n工具升级会提高伤害、范围和体力，技能可叠加。\n当前商店的工具每次攻击均耗能 1。\n护腕共振每局有次数上限，升级后强化效果。\n\n每两关结租一次，租金随关卡逐步提高；具体账单按 B 查看。\n余额不足则破产，收工后可买装备、学技能。\n完成正式租约后可继续涨租挑战，保留金币和全部升级。", 21, Text, true));
         Back(body, back);
     }
 }
+
 
 

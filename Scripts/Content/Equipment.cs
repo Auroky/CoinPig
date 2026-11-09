@@ -39,19 +39,20 @@ public static class EquipmentContent
     public static IReadOnlyList<ShopProduct> Products { get; } = Array.AsReadOnly(new ShopProduct[]
     {
         new("Rim", "加宽锤面", "升级扩大范围、提高伤害与体力", 18, 6, 3,
-            new(Radius: .12f, Stamina: 1), Weapon: Hammer,
-            Tiers: Tiers("锤", Hammer, new(Radius: .12f, Stamina: 1), new(Radius: .12f, Stamina: 1, Damage: 1)), DisplayYaw: 45),
+            new(Radius: .11f, Stamina: 1), Weapon: Hammer,
+            Tiers: Tiers("锤", Hammer, new(Radius: .11f, Stamina: 1), new(Radius: .11f, Stamina: 1, Damage: 1)), DisplayYaw: 45),
         new("Stamina", "共振护腕", "金色震荡 / 自动慢裂 / 群体金鸣\n每级体力 +1，与所有武器共存", 16, 12, 3,
             new(Stamina: 1), Appearance: "cuff", Tiers: Cuffs),
         new("Chainsaw", "电锯", "广域快切 · 升级提高伤害、范围和体力", 36, 32, 3,
-            new(Radius: .12f, Recovery: .02f, Stamina: 1, Damage: 1), Appearance: "chainsaw", Stage: 2,
+            new(Radius: .11f, Recovery: .02f, Stamina: 1, Damage: 1), Appearance: "chainsaw", Stage: 2,
             Requirements: Array.AsReadOnly(new[] { new ProductRequirement("Rim", 2), new ProductRequirement("Stamina", 1) }),
-            Weapon: Chainsaw, Tiers: Tiers("电锯", Chainsaw, new(Radius: .12f, Recovery: .02f, Stamina: 4),
-                new(Radius: .12f, Recovery: .02f, Stamina: 1, Damage: 1))),
+            Weapon: Chainsaw, Tiers: Tiers("电锯", Chainsaw, new(Radius: .11f, Recovery: .02f, Stamina: 4),
+                new(Radius: .11f, Recovery: .02f, Stamina: 1, Damage: 1))),
         new("Grinder", "砂轮", "大范围研磨 · 每击耗能 1，升级继续成长", 92, 60, 3,
-            new(Radius: .12f, Stamina: 1, Damage: 1), Appearance: "grinder", Stage: 3,
+            new(Radius: .11f, Stamina: 1, Damage: 1), Appearance: "grinder", Stage: 3,
             Requirements: Array.AsReadOnly(new[] { new ProductRequirement("Chainsaw", 2) }), Weapon: Grinder,
-            Tiers: Tiers("砂轮", Grinder, new(Radius: .12f, Stamina: 7), new(Radius: .12f, Stamina: 1, Damage: 1)))
+            Tiers: Tiers("砂轮", Grinder, new(Radius: .11f, Stamina: 7), new(Radius: .11f, Stamina: 1, Damage: 1)))
     });
 }
+
 
