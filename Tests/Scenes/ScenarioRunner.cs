@@ -16,7 +16,20 @@ internal static class ScenarioRunner
     }
     private static void MovePointer(Workshop g, Vector2 position)
     {
-        g.GetViewport().PushInput(new InputEventMouseMotion { Position = position, GlobalPosition = position }, true);
+        g.GetViewport().PushInput(new InputEventMouseMotion { Position = position, GlobalPosition = position, Relative = Vector2.One }, true);
+    }
+    private static async Task Click(Workshop game, string name)
+    {
+        await game.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+        var button = game.Interface.FindChildren(name, "Button", true, false).OfType<Button>().First(b => b.IsVisibleInTree());
+        Vector2 point = game.GetViewport().GetScreenTransform() * button.GetGlobalRect().GetCenter();
+        Input.ParseInputEvent(new InputEventMouseMotion { Position = point, GlobalPosition = point, Relative = Vector2.One });
+        Input.FlushBufferedEvents();
+        Input.ParseInputEvent(new InputEventMouseButton { Position = point, GlobalPosition = point, ButtonIndex = MouseButton.Left, Pressed = true });
+        Input.FlushBufferedEvents();
+        Input.ParseInputEvent(new InputEventMouseButton { Position = point, GlobalPosition = point, ButtonIndex = MouseButton.Left, Pressed = false });
+        Input.FlushBufferedEvents();
+        await game.ToSignal(game.GetTree(), SceneTree.SignalName.ProcessFrame);
     }
     private static void Tick(Workshop g, float seconds) { for (int i = 0; i < (int)Math.Ceiling(seconds / .05); i++) g._Process(.05); }
     private static async Task Capture(Workshop g, string name)
@@ -77,6 +90,8 @@ internal static class ScenarioRunner
                 Press(g, "Resume");
             }
             Check(g.Herd.Pigs.Count == 2 && g.Herd.Pigs.All(p => p.State.Definition.Id == "ceramic"), "starts with two ordinary pigs");
+            int arrivals = 0;
+            if (g.Bench is IRewardFeedback rewardFeedback) rewardFeedback.CoinCollected += () => arrivals++;
             int stamina = g.Session.Stamina;
             Tick(g, .8f);
             Check(g.Session.Stamina == stamina, "starting or resuming waits for pointer movement");
@@ -93,15 +108,31 @@ internal static class ScenarioRunner
             Press(g, "Resume");
             var target = g.Bench.ScreenPosition(g.Herd.Pigs[0]);
             var screenTarget = g.GetViewport().GetScreenTransform() * g.GetGlobalTransformWithCanvas() * target;
-            Input.ParseInputEvent(new InputEventMouseMotion { Position = screenTarget, GlobalPosition = screenTarget });
+            Input.ParseInputEvent(new InputEventMouseMotion { Position = screenTarget, GlobalPosition = screenTarget, Relative = Vector2.One });
             Input.FlushBufferedEvents();
             Tick(g, .25f);
             Check(g.Session.Stamina == stamina - 1 && g.Session.ShiftPigs >= 1, "mouse movement alone lands a hit without a button press");
+            if (g.Bench is TabletopView)
+            {
+                var camera = g.GetViewport().GetCamera3D();
+                Check(Mathf.Abs(camera.HOffset) + Mathf.Abs(camera.VOffset) > .00001f, "successful contact produces a short camera impulse");
+                var world = g.Herd.Pigs[0].Position;
+                Check(g.Bench.TryWorldPosition(g.Bench.ScreenPosition(world), out var recovered) && System.Numerics.Vector2.Distance(world, recovered) < .001f,
+                    "camera impulse does not displace the logical aim point");
+            }
             await Capture(g, "12-impact");
             Tick(g, .6f);
             Check(g.Session.Stamina == stamina - 2, "stationary pointer continues at the recovery cadence");
-            MovePointer(g, new(-100, -100)); Tick(g, .8f);
+            int earnedBalance = g.Session.Wallet;
+            MovePointer(g, new(-100, -100)); Tick(g, 1.1f);
             Check(g.Session.Stamina == stamina - 2, "leaving the table stops new automatic swings");
+            if (g.Bench is TabletopView table)
+            {
+                Check(arrivals > 0 && g.Session.Wallet == earnedBalance, "coin arrivals animate the wallet without granting currency again");
+                Check(table.GetNode<ImpactBurst>("ImpactEffects").ActiveCount == 0, "impact debris and pulses are removed after their lifetime");
+                var camera = g.GetViewport().GetCamera3D();
+                Check(camera.HOffset == 0 && camera.VOffset == 0, "camera returns to its neutral projection");
+            }
             Press(g, "EndDay"); Press(g, "ConfirmEnd");
             Check(g.Session.Phase == ShiftPhase.Shopping, "early end reaches settlement");
             await Capture(g, "03-settlement");
@@ -116,8 +147,14 @@ internal static class ScenarioRunner
             Check(g.Session.Wallet == originalCash, "replacing display providers cannot spend session money");
             Press(g, "Back");
             Press(g, "Equipment"); int wallet = g.Session.Wallet;
-            Press(g, "Buy_Rim"); Check(g.Session.Wallet == wallet && g.Interface.Menu.NoticeText.Contains("余额不足"), "unaffordable shop action is visible and non-destructive");
+            if (DisplayServer.GetName() == "headless") Press(g, "Buy_Rim"); else await Click(g, "Buy_Rim");
+            Check(g.Session.Wallet == wallet && g.Interface.Menu.NoticeText.Contains("余额不足"), "physical catalogue click is routed correctly and failed purchases preserve balance");
             await Capture(g, "04-shop");
+            if (g.SpatialCatalogs)
+            {
+                Press(g, "ViewRent"); Press(g, "Back");
+                Check(g.Interface.Menu.Page == MenuPage.Equipment && g.Session.Phase == ShiftPhase.Shopping, "rent opened from the gallery returns to the gallery");
+            }
             Press(g, "Back"); Press(g, "Skills");
             Press(g, "Learn_power2"); Check(g.Session.Damage == 1 && g.Session.Wallet == wallet, "locked skill cannot be purchased through UI");
             await Capture(g, "05-skills");

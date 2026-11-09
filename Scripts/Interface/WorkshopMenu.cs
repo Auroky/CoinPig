@@ -8,6 +8,7 @@ public enum MenuPage { None, Title, Receipt, Equipment, Skills, Reward, Ledger, 
 /// <summary>Owns menu navigation and display. It emits commands without changing a game session.</summary>
 public partial class WorkshopMenu : Control
 {
+    public bool SpatialCatalogs { get; set; }
     public event Action? Start, EndDay, Restart, Resume, Equipment, Skills, Fullscreen, Quit;
     public event Action<string, int>? Purchase;
     public event Action<string>? Learn;
@@ -17,15 +18,21 @@ public partial class WorkshopMenu : Control
     public string NoticeText => _notice?.Text ?? "";
     private ColorRect _shade = null!;
     private VBoxContainer? _body;
+    private PanelContainer? _panel;
     private Label? _notice;
     private Action? _back;
     private Vector2 _bodySize;
-    private bool _titleLayout;
+    private bool _titleLayout, _fullGallery;
 
     public override void _Ready()
     {
         MouseFilter = MouseFilterEnum.Stop;
-        _shade = new ColorRect { Color = new Color(.025f, .019f, .013f, .87f), MouseFilter = MouseFilterEnum.Ignore };
+        AddChild(new BackBufferCopy { CopyMode = BackBufferCopy.CopyModeEnum.Viewport });
+        _shade = new ColorRect
+        {
+            MouseFilter = MouseFilterEnum.Ignore,
+            Material = new ShaderMaterial { Shader = GD.Load<Shader>("res://Scripts/Interface/ModalBlur.gdshader") }
+        };
         AddChild(_shade);
         _shade.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         Resized += Arrange;
@@ -34,16 +41,27 @@ public partial class WorkshopMenu : Control
 
     private VBoxContainer Open(MenuPage page, string heading, string subtitle, Vector2 size, Action? back = null)
     {
-        _body?.QueueFree();
-        if (_body != null) _body.Hide();
+        _panel?.Hide();
+        _panel?.QueueFree();
         Page = page;
         _back = back;
         _titleLayout = page == MenuPage.Title;
-        _shade.Color = new Color(.025f, .019f, .013f, _titleLayout ? .35f : .88f);
+        _fullGallery = false;
         _bodySize = size;
-        _body = Column(this, 18);
-        _body.AddChild(Label(heading, _titleLayout ? 88 : 36, Brass));
+        _panel = new PanelContainer();
+        var surface = Surface(new Color(.10f,.075f,.055f,.86f), new Color(.68f,.49f,.27f,.42f), 30);
+        if (page == MenuPage.Reward) { surface.BgColor = Colors.Transparent; surface.SetBorderWidthAll(0); }
+        surface.SetCornerRadiusAll(16);
+        surface.ShadowColor = new Color(0,0,0,.36f); surface.ShadowSize=page == MenuPage.Reward ? 0 : 20; surface.ShadowOffset=new(0,8);
+        _panel.AddThemeStyleboxOverride("panel", surface);
+        AddChild(_panel);
+        _panel.Resized += Arrange;
+        _body = Column(_panel, 18);
+        var title = Label(heading, _titleLayout ? 46 : 36, Brass);
+        title.HorizontalAlignment = HorizontalAlignment.Center;
+        _body.AddChild(title);
         _notice = Label(subtitle, 18, Muted, true);
+        _notice.HorizontalAlignment = HorizontalAlignment.Center;
         _body.AddChild(_notice);
         Show();
         Arrange();
@@ -52,15 +70,16 @@ public partial class WorkshopMenu : Control
 
     private void Arrange()
     {
-        if (_body == null) return;
-        _body.Size = _bodySize;
-        _body.Position = _titleLayout ? new(Size.X * .12f, Size.Y * .24f) : (Size - _bodySize) / 2;
+        if (_panel == null) return;
+        _panel.Size = _fullGallery ? Size : _bodySize;
+        _panel.Position = _fullGallery ? Vector2.Zero : new((Size.X - _panel.Size.X) / 2, Mathf.Max(12, (Size.Y - _panel.Size.Y) / 2));
     }
 
     public void Close()
     {
-        _body?.Hide();
-        _body?.QueueFree();
+        _panel?.Hide();
+        _panel?.QueueFree();
+        _panel = null;
         _body = null;
         _notice = null;
         _back = null;
@@ -94,7 +113,7 @@ public partial class WorkshopMenu : Control
 
     public void ShowTitle()
     {
-        var body = Open(MenuPage.Title, "COINPIG", "还 款 日", new(430, 430));
+        var body = Open(MenuPage.Title, "COINPIG", "还 款 日", new(680, 540));
         body.AddChild(new Control { CustomMinimumSize = new(0, 24), MouseFilter = MouseFilterEnum.Ignore });
         body.AddChild(Button("开始游戏", () => Start?.Invoke(), "Start", true));
         body.AddChild(Button("玩法", () => ShowHelp(ShowTitle), "Help"));
@@ -139,6 +158,11 @@ public partial class WorkshopMenu : Control
 
     public void ShowEquipment(IShopView shop, SessionSnapshot state)
     {
+        if (SpatialCatalogs)
+        {
+            ShowGallery(shop, null, state);
+            return;
+        }
         var body = Open(MenuPage.Equipment, "装备", $"余额 ¥{shop.Wallet}", new(1000, 650), () => ShowReceipt(state));
         Rule(body);
         var row = Row(body, 34);
@@ -160,6 +184,11 @@ public partial class WorkshopMenu : Control
 
     public void ShowSkills(ISkillTreeView skills, SessionSnapshot state)
     {
+        if (SpatialCatalogs)
+        {
+            ShowGallery(null, skills, state);
+            return;
+        }
         var body = Open(MenuPage.Skills, "技能", $"余额 ¥{state.Wallet}", new(1280, 710), () => ShowReceipt(state));
         Rule(body);
         var columns = Row(body, 22);
@@ -193,30 +222,98 @@ public partial class WorkshopMenu : Control
         Back(body, () => ShowReceipt(state), "返回结算");
     }
 
+    private void ShowGallery(IShopView? shop, ISkillTreeView? skills, SessionSnapshot state)
+    {
+        bool training = skills != null;
+        var body = Open(training ? MenuPage.Skills : MenuPage.Equipment, "", "", Size, () => ShowReceipt(state));
+        _fullGallery = true;
+        _panel!.MouseFilter = MouseFilterEnum.Ignore;
+        _panel.AddThemeStyleboxOverride("panel", Surface(Colors.Transparent, null, 0));
+        body.MouseFilter = MouseFilterEnum.Ignore;
+        body.AddThemeConstantOverride("separation", 0);
+        body.GetChild<Control>(0).Hide();
+        body.RemoveChild(_notice!);
+        var gallery = new UpgradeGallery { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
+        _panel.AddChild(gallery);
+        _panel.MoveChild(gallery, 0);
+        var bar = new PanelContainer();
+        var barStyle = Surface(new Color(.07f,.055f,.04f,.86f), null, 18);
+        barStyle.SetCornerRadiusAll(0);
+        bar.AddThemeStyleboxOverride("panel", barStyle);
+        body.AddChild(bar);
+        var tabs = Row(bar, 16);
+        var back = Button("返回结算", () => ShowReceipt(state), "Back", false, true);
+        back.CustomMinimumSize = new(160, 50);
+        tabs.AddChild(back);
+        var equipmentTab = Button("商店", () => Equipment?.Invoke(), "EquipmentTab");
+        var skillTab = Button("技能树", () => Skills?.Invoke(), "SkillsTab");
+        equipmentTab.CustomMinimumSize = skillTab.CustomMinimumSize = new(150, 50);
+        equipmentTab.Disabled = !training; skillTab.Disabled = training;
+        StyleTab(equipmentTab); StyleTab(skillTab);
+        tabs.AddChild(equipmentTab); tabs.AddChild(skillTab);
+        var balance = Label($"金币 ¥{state.Wallet}", 22, Brass);
+        balance.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        balance.VerticalAlignment = VerticalAlignment.Center;
+        tabs.AddChild(balance);
+        tabs.AddChild(Button("查看租金", () => ShowLedger(state, () => { if (training) Skills?.Invoke(); else Equipment?.Invoke(); }), "ViewRent", false, true));
+        tabs.AddChild(Button($"进入第 {state.Day + 1} 局", () => Start?.Invoke(), "Next", true, true));
+        body.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore });
+        var footer = new PanelContainer { CustomMinimumSize = new(0, 82) };
+        footer.AddThemeStyleboxOverride("panel", barStyle);
+        body.AddChild(footer);
+        _notice!.Text = training ? "沿金线解锁技能，使用金币购买。" : "点击柜中的锤子或护腕购买，自上而下逐阶解锁。";
+        _notice.VerticalAlignment = VerticalAlignment.Center;
+        footer.AddChild(_notice);
+        gallery.Purchase += (id, level) => Purchase?.Invoke(id, level);
+        gallery.Learn += id => Learn?.Invoke(id);
+        gallery.Message += Notify;
+        if (training) gallery.ShowSkills(skills!); else gallery.ShowProducts(shop!);
+        Arrange();
+    }
+
     public void ShowRewards(SessionSnapshot state)
     {
-        var body = Open(MenuPage.Reward, "租金已付", "领取一项奖励", new(1120, 510));
-        Rule(body);
+        var body = Open(MenuPage.Reward, "选择一项能力", $"租金已付 ¥{state.Receipt?.Paid ?? 0} · 当前金币 ¥{state.Wallet}", new(1180, 620));
         var row = Row(body, 24);
         foreach (var card in state.Perks)
         {
-            var column = Column(row, 22);
-            column.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-            column.AddChild(new RewardEmblem { Kind = card.Kind, CustomMinimumSize = new(0, 150), MouseFilter = MouseFilterEnum.Ignore });
-            column.AddChild(Label(card.Name, 26, Brass));
-            column.AddChild(Label(card.Description, 18, Text, true));
-            column.AddChild(Button("选择", () => Choose?.Invoke(card.Kind), "Choose_" + card.Kind, true));
+            var button = Button("", () => Choose?.Invoke(card.Kind), "Choose_" + card.Kind);
+            button.CustomMinimumSize = new(0, 410);
+            button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            button.ClipContents = true;
+            var normal = Surface(new Color(.065f,.046f,.033f,.84f), new("ab773ab0"), 0);
+            normal.SetCornerRadiusAll(12);
+            var hover = Surface(new Color(.28f,.18f,.075f,.90f), Brass, 0);
+            hover.SetCornerRadiusAll(12);
+            hover.ShadowColor = new Color(.85f,.56f,.21f,.18f); hover.ShadowSize = 12;
+            button.AddThemeStyleboxOverride("normal", normal);
+            button.AddThemeStyleboxOverride("hover", hover);
+            row.AddChild(button);
+            var margin = new MarginContainer { MouseFilter = MouseFilterEnum.Ignore };
+            button.AddChild(margin); margin.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+            foreach (string side in new[] { "left", "right", "top", "bottom" }) margin.AddThemeConstantOverride("margin_" + side, 22);
+            var column = Column(margin, 18); column.MouseFilter = MouseFilterEnum.Ignore;
+            var title = Label(card.Name, 27, Brass); title.HorizontalAlignment = HorizontalAlignment.Center;
+            column.AddChild(title);
+            column.AddChild(new RewardEmblem { Kind = card.Kind, CustomMinimumSize = new(0, 160), MouseFilter = MouseFilterEnum.Ignore });
+            Rule(column);
+            var description = Label(card.Description, 20, Text, true);
+            description.CustomMinimumSize = new(0, 104);
+            description.HorizontalAlignment = HorizontalAlignment.Center;
+            description.VerticalAlignment = VerticalAlignment.Center;
+            column.AddChild(description);
         }
     }
 
-    public void ShowLedger(SessionSnapshot state)
+    public void ShowLedger(SessionSnapshot state, Action? back = null)
     {
-        var body = Open(MenuPage.Ledger, "租约", $"余额 ¥{state.Wallet}", new(650, 600), () => Resume?.Invoke());
+        Action returnToPrevious = back ?? (() => Resume?.Invoke());
+        var body = Open(MenuPage.Ledger, "租约", $"余额 ¥{state.Wallet}", new(650, 600), returnToPrevious);
         Rule(body);
         foreach (var due in state.Schedule)
             AddLedgerLine(body, $"第 {due.Day} 天  ·  ¥{due.Amount}", GameText.Deadline(due));
         Rule(body);
-        Back(body, () => Resume?.Invoke(), "返回营业");
+        Back(body, returnToPrevious, back == null ? "返回营业" : "返回工坊");
     }
 
     public void ShowPause()

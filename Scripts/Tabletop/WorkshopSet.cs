@@ -1,109 +1,118 @@
 using Godot;
 
-/// <summary>Builds the desk, lighting and camera; it has no game-state responsibilities.</summary>
-public static class WorkshopSet
+public sealed class WorkshopSet
 {
-    public static Camera3D Build(Node3D root, TabletopMaterials materials)
+    private readonly TabletopMaterials _materials;
+    private WorkshopSet(TabletopMaterials materials) => _materials = materials;
+    public static Camera3D Build(Node3D root, TabletopMaterials materials) => new WorkshopSet(materials).BuildDesk(root);
+    private MeshInstance3D Mesh(Node3D parent, Mesh mesh, Vector3 at, Color color) => SceneShapes.Mesh(parent, mesh, at, _materials.Paint(color));
+    private MeshInstance3D Box(Node3D parent, Vector3 at, Vector3 size, Color color) => SceneShapes.Box(parent, at, size, _materials.Paint(color));
+    private MeshInstance3D Cylinder(Node3D parent, Vector3 at, float bottom, float top, float height, Color color, int sides = 8) => SceneShapes.Cylinder(parent, at, bottom, top, height, _materials.Paint(color), sides);
+    private MeshInstance3D Beam(Node3D parent, Vector3 a, Vector3 b, float width, Color color)
+    {
+        var beam = Box(parent, (a + b) / 2, new(width, a.DistanceTo(b), width), color);
+        beam.Quaternion = new Quaternion(Vector3.Up, (b - a).Normalized());
+        return beam;
+    }
+
+    private MeshInstance3D Oval(Node3D parent, Vector3 at, Vector3 radii, Color tint)
+    {
+        var shape = Mesh(parent, new SphereMesh { Radius = 1, Height = 2, RadialSegments = 24, Rings = 14 }, at, tint);
+        shape.Scale = radii;
+        return shape;
+    }
+
+    private Camera3D BuildDesk(Node3D root)
     {
         var environment = new Godot.Environment
         {
             BackgroundMode = Godot.Environment.BGMode.Color,
-            BackgroundColor = new("171915"),
+            BackgroundColor = new Color("302a28"),
             AmbientLightSource = Godot.Environment.AmbientSource.Color,
-            AmbientLightColor = new("d7d8ca"),
-            AmbientLightEnergy = .28f,
-            ReflectedLightSource = Godot.Environment.ReflectionSource.Disabled,
-            TonemapMode = Godot.Environment.ToneMapper.Linear
+            AmbientLightColor = new("e2d9d7"),
+            AmbientLightEnergy = 0.34f,
+            ReflectedLightSource = Godot.Environment.ReflectionSource.Disabled
         };
         root.AddChild(new WorldEnvironment { Environment = environment });
         root.AddChild(new DirectionalLight3D
         {
-            RotationDegrees = new(-58, -32, 0), LightColor = new("ffe7ce"), LightEnergy = .48f,
-            ShadowEnabled = true, ShadowOpacity = .75f, DirectionalShadowMaxDistance = 32,
-            ShadowBias = .03f, ShadowNormalBias = .6f
-        });
-        root.AddChild(new OmniLight3D
-        {
-            Position = new(6, 6, 1), LightColor = new("b2c4cc"), LightEnergy = .18f,
-            OmniRange = 18, ShadowEnabled = false
+            RotationDegrees = new(-47, -38, 0),
+            LightColor = new("ffe4ce"),
+            LightEnergy = 0.47f,
+            ShadowEnabled = true,
+            ShadowOpacity = 0.62f,
+            DirectionalShadowMaxDistance = 38
         });
         var camera = new Camera3D
         {
-            Name = "DeskCamera", Current = true,
+            Name = "DeskCamera",
+            Current = true,
             Projection = Camera3D.ProjectionType.Orthogonal,
             KeepAspect = Camera3D.KeepAspectEnum.Width,
-            Size = 18.6f, Position = new(0, 13.5f, 11.5f), Near = .1f, Far = 60
+            Size = 18,
+            Position = new(0, 15.5f, 9.5f)
         };
         root.AddChild(camera);
-        camera.LookAt(new(0, 0, .15f), Vector3.Up);
-
-        var darkWood = materials.Paint("39291e", .8f);
-        var iron = materials.Paint("333b32", .46f, .65f);
-        var brass = materials.Paint("b5975b", .34f, .7f);
-        SceneShapes.Box(root, new(0, -.30f, 0), new(20, .55f, 13.0f), darkWood);
-        string[] tones = { "644730", "5e422e", "62452e", "684a32", "60422c", "63452f", "5f432e", "654831" };
+        camera.LookAt(Vector3.Zero, Vector3.Up);
+        Box(root, new(0, -0.27f, 0), new(20.2f, 0.42f, 13.2f), new("3d291f"));
+        string[] palette = { "785135", "795137", "80573b", "765038", "7d543a", "785137", "7c5439", "79513a" };
         for (int i = 0; i < 8; i++)
-            SceneShapes.Box(root, new(0, -.045f, (i - 3.5f) * 1.6f), new(19.8f, .09f, 1.592f), materials.Wood(tones[i], i * 7.13f));
-        foreach (float x in new[] { -9.3f, 9.3f })
         {
-            SceneShapes.Box(root, new(x, .015f, 0), new(.16f, .03f, 12.85f), iron);
-            for (int i = 0; i < 6; i++) SceneShapes.Cylinder(root, new(x, .038f, -5.7f + i * 2.28f), .045f, .045f, .025f, brass, 12);
+            var plank = Box(root, new(0, -0.065f, (i - 3.5f) * 1.57f), new(20, 0.13f, 1.563f), Colors.White);
+            plank.MaterialOverride = _materials.Wood(palette[i], i * 8.31f);
         }
-        // The measuring strip makes the surface read as a physical workbench.
-        SceneShapes.Box(root, new(0, .016f, 4.6f), new(15, .025f, .30f), materials.Paint("9a7b4d", .55f, .4f));
-        for (int i = 0; i <= 60; i++)
-            SceneShapes.Box(root, new(-7.3f + i * .243f, .031f, 4.56f), new(.012f, .004f, i % 5 == 0 ? .20f : .10f), darkWood);
-        Lamp(root, materials, new(-7.65f, 0, -4.45f));
-        Mug(root, materials, new(7.45f, 0, -4.15f));
-        Ledger(root, materials, new(7.55f, 0, 3.5f));
-        Pencil(root, materials, new(-7.6f, .06f, 3.7f));
+        // Desk-edge props establish scale, leaving the running lanes open.
+        Lamp(root, new(-7.66f, 0, -4.92f));
+        Coffee(root, new(7.62f, 0, -4.88f));
+        Papers(root, new(7.76f, 0, 4.82f));
+        Pencil(root, new(-7.49f, 0, 4.55f));
         return camera;
     }
 
-    private static void Lamp(Node3D parent, TabletopMaterials materials, Vector3 position)
+    private void Lamp(Node3D desk, Vector3 pos)
     {
-        var lamp = new Node3D { Position = position, RotationDegrees = new(0, -12, 0) };
-        parent.AddChild(lamp);
-        var green = materials.Paint("294b3e", .33f, .25f);
-        var brass = materials.Paint("ad8850", .35f, .65f);
-        SceneShapes.Cylinder(lamp, new(0, .12f, 0), .63f, .53f, .23f, green, 40);
-        SceneShapes.Rod(lamp, new(0, .2f, -.1f), new(0, 1.45f, -.15f), .055f, brass);
-        SceneShapes.Rod(lamp, new(0, 1.45f, -.15f), new(0, 1.65f, .55f), .06f, brass);
-        SceneShapes.Ellipsoid(lamp, new(0, 1.64f, .58f), new(.9f, .28f, .4f), green);
-        SceneShapes.Ellipsoid(lamp, new(0, 1.49f, .69f), new(.75f, .045f, .24f), materials.Paint("f3d99c", .6f));
-        var bulb = new OmniLight3D { Position = new(.3f, 1.3f, 1), LightColor = new("ffd8a0"), LightEnergy = .65f, OmniRange = 7 };
-        lamp.AddChild(bulb);
+        var lamp = new Node3D { Position = pos, RotationDegrees = new(0, 12, 0) };
+        desk.AddChild(lamp);
+        var brass = new Color("bf9153");
+        var enamel = new Color("255652");
+        Cylinder(lamp, new(0, 0.09f, 0), 0.62f, 0.66f, 0.17f, new("363c36"), 36);
+        Cylinder(lamp, new(0, 0.21f, 0), 0.63f, 0.50f, 0.13f, enamel, 36);
+        Cylinder(lamp, new(0, 0.86f, -0.10f), 0.085f, 0.07f, 1.27f, brass, 16);
+        Beam(lamp, new(0, 1.42f, -0.1f), new(0, 1.67f, 0.39f), 0.11f, brass);
+        var shade = Oval(lamp, new(0, 1.63f, 0.43f), new(1.19f, 0.38f, 0.43f), enamel);
+        shade.RotationDegrees = new(-12, 0, 0);
+        Oval(lamp, new(0, 1.49f, 0.68f), new(1.02f, 0.10f, 0.22f), new("edd6a1"));
     }
 
-    private static void Mug(Node3D parent, TabletopMaterials materials, Vector3 position)
+    private void Coffee(Node3D desk, Vector3 pos)
     {
-        var mug = new Node3D { Position = position, RotationDegrees = new(0, 28, 0) };
-        parent.AddChild(mug);
-        var glaze = materials.Paint("c6c4ad", .3f);
-        SceneShapes.Cylinder(mug, new(0, .04f, 0), .62f, .66f, .08f, glaze, 40);
-        SceneShapes.Cylinder(mug, new(0, .37f, 0), .35f, .43f, .65f, glaze, 40);
-        SceneShapes.Cylinder(mug, new(0, .704f, 0), .37f, .37f, .013f, materials.Paint("37281c", .22f), 40);
-        var handle = SceneShapes.Mesh(mug, new TorusMesh { InnerRadius = .12f, OuterRadius = .23f, Rings = 24, RingSegments = 12 }, new(.43f, .42f, 0), glaze);
-        handle.RotationDegrees = new(90, 0, 0);
+        var cup = new Node3D { Position = pos };
+        desk.AddChild(cup);
+        Cylinder(cup, new(0, 0.06f, 0), 0.70f, 0.77f, 0.10f, new("a9b8aa"), 40);
+        Cylinder(cup, new(0, 0.37f, 0), 0.37f, 0.50f, 0.61f, new("c6d3c5"), 40);
+        Cylinder(cup, new(0, 0.681f, 0), 0.445f, 0.445f, 0.015f, new("442f24"), 40);
+        var handle = Mesh(cup, new TorusMesh { InnerRadius = 0.13f, OuterRadius = 0.239f, Rings = 20, RingSegments = 8 }, new(0.50f, 0.44f, 0.08f), new("c6d3c5"));
+        handle.RotationDegrees = new(38, -16, 0);
     }
 
-    private static void Ledger(Node3D parent, TabletopMaterials materials, Vector3 position)
+    private void Papers(Node3D desk, Vector3 pos)
     {
-        var ledger = new Node3D { Position = position, RotationDegrees = new(0, -12, 0) };
-        parent.AddChild(ledger);
-        var paper = materials.Paint("cdbd99", .95f);
-        SceneShapes.Box(ledger, new(0, .06f, 0), new(1.8f, .1f, 2.2f), materials.Paint("34443a", .8f));
-        SceneShapes.Box(ledger, new(0, .12f, 0), new(1.65f, .025f, 2.04f), paper);
-        for (int i = 0; i < 7; i++)
-            SceneShapes.Box(ledger, new(0, .135f, -.7f + i * .22f), new(1.3f, .004f, .015f), materials.Paint("92886b", .95f));
+        var stack = new Node3D { Position = pos, RotationDegrees = new(0, -17, 0) };
+        desk.AddChild(stack);
+        Box(stack, new(0, 0.025f, 0), new(2.27f, 0.04f, 1.8f), new("b2a386")).RotationDegrees = new(0, 6, 0);
+        Box(stack, new(0, 0.055f, 0), new(2.23f, 0.035f, 1.8f), new("e2cfaa"));
+        Box(stack, new(-0.39f, 0.075f, -0.48f), new(0.98f, 0.005f, 0.11f), new("889388"));
+        for (int i = 0; i < 4; i++)
+            Box(stack, new(0, 0.076f, -0.19f + i * 0.18f), new(1.72f, 0.005f, 0.018f), new("b1aa90"));
     }
-
-    private static void Pencil(Node3D parent, TabletopMaterials materials, Vector3 position)
+    private void Pencil(Node3D desk, Vector3 pos)
     {
-        var pencil = new Node3D { Position = position, RotationDegrees = new(0, -20, 90) };
-        parent.AddChild(pencil);
-        SceneShapes.Cylinder(pencil, Vector3.Zero, .055f, .055f, 1.8f, materials.Paint("bd8f46", .7f), 6);
-        SceneShapes.Cylinder(pencil, new(0, .99f, 0), .055f, 0, .18f, materials.Paint("d6ba80", .9f), 6);
-        SceneShapes.Cylinder(pencil, new(0, 1.075f, 0), .018f, 0, .06f, materials.Paint("292820", .8f), 6);
+        var pen = new Node3D { Position = pos + new Vector3(0, 0.07f, 0), RotationDegrees = new(0, 25, 82) };
+        desk.AddChild(pen);
+        Cylinder(pen, Vector3.Zero, 0.077f, 0.077f, 2.02f, new("d4974d"), 6);
+        Cylinder(pen, new(0, 1.12f, 0), 0.077f, 0.012f, 0.23f, new("d1af7d"), 6);
+        Cylinder(pen, new(0, 1.255f, 0), 0.025f, 0.002f, 0.05f, new("333c3a"), 6);
+        Cylinder(pen, new(0, -1.03f, 0), 0.08f, 0.08f, 0.15f, new("c6bb9b"), 12);
+        Cylinder(pen, new(0, -1.16f, 0), 0.074f, 0.07f, 0.12f, new("bd7771"), 12);
     }
 }

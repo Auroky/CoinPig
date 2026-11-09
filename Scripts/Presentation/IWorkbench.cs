@@ -16,6 +16,6 @@ public interface IWorkbench
     Vector2 ScreenPosition(WorldPoint worldPoint);
     Vector2 ScreenPosition(PigMotion pig);
     void Tick(float delta);
-    void Impact(WorldPoint point, SwingResult strike, int coins);
+    void Impact(WorldPoint point, SwingResult strike);
     void Present();
 }

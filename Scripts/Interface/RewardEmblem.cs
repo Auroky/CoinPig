@@ -1,45 +1,90 @@
 using Godot;
 
+/// <summary>卡牌上的金色符号，随布局缩放，无需额外贴图。</summary>
 public partial class RewardEmblem : Control
 {
     public Perk Kind { get; set; }
+    private readonly Color _gold = new("cda06b");
+    private readonly Color _shade = new("715535");
+
+    public override void _Ready()
+    {
+        MouseFilter = MouseFilterEnum.Ignore;
+        Resized += QueueRedraw;
+    }
+
     public override void _Draw()
     {
-        var c = Size / 2;
-        DrawCircle(c + new Vector2(3, 4), 48, new Color(0, 0, 0, .3f));
-        DrawCircle(c, 48, new("78603b"));
-        DrawCircle(c, 43, new("c4a064"));
-        DrawArc(c, 36, 0, Mathf.Tau, 64, new("78603b"), 2, true);
-        var ink = new Color("514026");
+        float scale = Mathf.Min(Size.X, Size.Y) / 140;
+        DrawSetTransform(Size / 2 - new Vector2(64, 64) * scale, 0, Vector2.One * scale);
+        DrawCircle(new(64, 64), 54, new Color(0.65f, 0.39f, 0.14f, 0.06f), true, -1, true);
         switch (Kind)
         {
             case Perk.PairBonus:
-                DrawArc(c + new Vector2(-9, 0), 13, 0, Mathf.Tau, 32, ink, 4, true);
-                DrawArc(c + new Vector2(9, 0), 13, 0, Mathf.Tau, 32, ink, 4, true);
+                Pig(new(43, 57), 0.72f);
+                Pig(new(84, 78), 0.72f);
                 break;
             case Perk.SecondWind:
-                DrawArc(c, 19, .1f, 5.3f, 40, ink, 5, true);
-                DrawColoredPolygon(new[] { c + new Vector2(7, -25), c + new Vector2(7, -9), c + new Vector2(21, -14) }, ink);
+                Hammer();
+                DrawArc(new(64, 64), 49, -2.8f, 1.0f, 32, _gold, 4, true);
+                DrawColoredPolygon(new Vector2[] { new(85, 107), new(101, 94), new(104, 113) }, _gold);
                 break;
             case Perk.CoinValue:
-                DrawArc(c, 20, 0, Mathf.Tau, 40, ink, 4, true);
-                DrawLine(c + new Vector2(0, -12), c + new Vector2(0, 12), ink, 5);
+                for (int i = 0; i < 3; i++)
+                {
+                    Vector2 center = new(46 + i * 18, 79 - i * 16);
+                    DrawCircle(center + new Vector2(0, 4), 22, _shade, true, -1, true);
+                    DrawCircle(center, 22, _gold, true, -1, true);
+                    DrawArc(center, 16, 0, Mathf.Tau, 32, _shade, 2, true);
+                    DrawLine(center + new Vector2(0, -8), center + new Vector2(0, 8), _shade, 4, true);
+                }
                 break;
             case Perk.Lunch:
-                DrawRect(new(c + new Vector2(-16, -8), new(29, 25)), ink, false, 4);
-                DrawArc(c + new Vector2(15, 2), 8, -1.5f, 1.5f, 20, ink, 3, true);
-                DrawLine(c + new Vector2(-6, -22), c + new Vector2(-6, -13), ink, 3);
+                CupBody();
+                DrawArc(new(84, 70), 15, -Mathf.Pi / 2, Mathf.Pi / 2, 18, _gold, 7, true);
+                DrawLine(new(27, 100), new(94, 100), _gold, 4, true);
+                for (int i = 0; i < 3; i++)
+                    DrawPolyline(new Vector2[] { new(40 + i * 17, 43), new(36 + i * 17, 34), new(42 + i * 17, 24) }, _gold, 3, true);
                 break;
             case Perk.Precision:
-                DrawArc(c, 20, 0, Mathf.Tau, 40, ink, 3, true);
-                DrawCircle(c, 6, ink);
-                DrawLine(c - new Vector2(27, 0), c + new Vector2(27, 0), ink, 2);
-                DrawLine(c - new Vector2(0, 27), c + new Vector2(0, 27), ink, 2);
+                Pig(new(64, 64), 0.72f);
+                DrawArc(new(64, 64), 42, 0, Mathf.Tau, 48, _gold, 2, true);
+                for (int i = 0; i < 4; i++)
+                {
+                    Vector2 direction = Vector2.FromAngle(i * Mathf.Pi / 2);
+                    DrawLine(new Vector2(64, 64) + direction * 35, new Vector2(64, 64) + direction * 53, _gold, 4, true);
+                }
                 break;
             case Perk.WideRim:
-                DrawRect(new(c + new Vector2(-24, -16), new(48, 19)), ink);
-                DrawLine(c + new Vector2(0, 3), c + new Vector2(0, 24), ink, 7);
+                DrawArc(new(64, 67), 46, 0, Mathf.Tau, 48, _shade, 2, true);
+                Hammer();
                 break;
         }
+    }
+
+    private void CupBody()
+    {
+        using var surface = WorkshopStyle.Surface(_gold, null, 0);
+        surface.SetCornerRadiusAll(7);
+        DrawStyleBox(surface, new Rect2(30, 51, 55, 43));
+    }
+
+    private void Hammer()
+    {
+        DrawLine(new(45, 100), new(78, 42), _gold, 13, true);
+        DrawColoredPolygon(new Vector2[] { new(45, 31), new(56, 16), new(103, 48), new(91, 67) }, _gold);
+        DrawLine(new(46, 89), new(54, 94), _shade, 3, true);
+        DrawLine(new(52, 79), new(60, 84), _shade, 3, true);
+    }
+
+    private void Pig(Vector2 center, float scale)
+    {
+        DrawCircle(center, 29 * scale, _gold, true, -1, true);
+        DrawRect(new(center + new Vector2(23, -4) * scale, new Vector2(16, 16) * scale), _gold);
+        DrawColoredPolygon(new Vector2[] { center + new Vector2(1, -23) * scale, center + new Vector2(12, -40) * scale, center + new Vector2(22, -20) * scale }, _gold);
+        DrawRect(new(center + new Vector2(-20, 17) * scale, new Vector2(9, 20) * scale), _gold);
+        DrawRect(new(center + new Vector2(11, 17) * scale, new Vector2(9, 20) * scale), _gold);
+        DrawCircle(center + new Vector2(17, -8) * scale, 2.6f * scale, _shade, true, -1, true);
+        DrawLine(center + new Vector2(-8, -20) * scale, center + new Vector2(4, -20) * scale, _shade, 3, true);
     }
 }

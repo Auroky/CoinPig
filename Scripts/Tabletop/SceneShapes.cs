@@ -14,7 +14,7 @@ public static class SceneShapes
 
     public static MeshInstance3D Ellipsoid(Node3D parent, Vector3 position, Vector3 radius, Material material)
     {
-        var instance = Mesh(parent, new SphereMesh { Radius = 1, Height = 2, RadialSegments = 32, Rings = 16 }, position, material);
+        var instance = Mesh(parent, new SphereMesh { Radius = 1, Height = 2, RadialSegments = 24, Rings = 14 }, position, material);
         instance.Scale = radius;
         return instance;
     }
@@ -25,6 +25,13 @@ public static class SceneShapes
     public static MeshInstance3D Rod(Node3D parent, Vector3 from, Vector3 to, float radius, Material material)
     {
         var instance = Cylinder(parent, (from + to) / 2, radius, radius, from.DistanceTo(to), material, 16);
+        instance.Quaternion = new Quaternion(Vector3.Up, (to - from).Normalized());
+        return instance;
+    }
+
+    public static MeshInstance3D Beam(Node3D parent, Vector3 from, Vector3 to, float width, Material material)
+    {
+        var instance = Box(parent, (from + to) / 2, new(width, from.DistanceTo(to), width), material);
         instance.Quaternion = new Quaternion(Vector3.Up, (to - from).Normalized());
         return instance;
     }

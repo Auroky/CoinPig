@@ -4,12 +4,14 @@ using System;
 /// <summary>Connects the session, workbench, input and interface.</summary>
 public partial class Workshop : Node2D
 {
+    [Export] public bool SpatialCatalogs { get; set; }
     internal GameSession Session { get; private set; } = new();
     internal PigHerd Herd { get; private set; } = new(HerdLayout.Initial);
     internal IWorkbench Bench { get; private set; } = null!;
     internal WorkshopUi Interface { get; private set; } = null!;
     private readonly HammerSwing _hammer = new();
     private ImpactAudio _audio = null!;
+    private IRewardFeedback? _rewardFeedback;
     private float _settleDelay;
     private Vector2 _pointerPosition = new(-1, -1);
     private System.Numerics.Vector2 _strikePoint;
@@ -20,10 +22,12 @@ public partial class Workshop : Node2D
         Bench = GetNode("Workbench") as IWorkbench ??
             throw new InvalidOperationException("The scene needs a workbench presentation.");
         _audio = new ImpactAudio();
-        Interface = new WorkshopUi();
+        Interface = new WorkshopUi { SpatialCatalogs = SpatialCatalogs };
         AddChild(_audio);
         AddChild(Interface);
         Bench.Bind(Herd.Pigs);
+        _rewardFeedback = Bench as IRewardFeedback;
+        if (_rewardFeedback != null) _rewardFeedback.CoinCollected += Interface.Hud.PulseWallet;
         var menu = Interface.Menu;
         var hud = Interface.Hud;
         menu.Start += Begin;
@@ -82,6 +86,7 @@ public partial class Workshop : Node2D
     private void Begin()
     {
         if (!Session.BeginShift()) return;
+        _audio.Clear();
         _hammer.Reset();
         _settleDelay = 0;
         _pointerPosition = new(-1, -1);
@@ -95,6 +100,8 @@ public partial class Workshop : Node2D
     private void Restart()
     {
         Session = new GameSession();
+        _audio.Clear();
+        Interface.Hud.ResetFeedback();
         _hammer.Reset();
         _settleDelay = 0;
         ResetHerd();
@@ -157,7 +164,7 @@ public partial class Workshop : Node2D
     {
         if (input is InputEventMouseMotion motion)
         {
-            _pointerPosition = motion.Position;
+            if (!motion.Relative.IsZeroApprox()) _pointerPosition = motion.Position;
             return;
         }
         if (input is not InputEventKey key || !key.Pressed || key.Echo) return;
@@ -184,19 +191,29 @@ public partial class Workshop : Node2D
         Interface.Hud.Visible = active;
         Bench.ShowAim = active;
         Bench.ShowPigs = Session.Phase != ShiftPhase.Ready;
+        if (_rewardFeedback != null) _rewardFeedback.CoinDestination = Interface.Hud.WalletAnchor;
+        bool overTable = Bench.TryWorldPosition(_pointerPosition, out var worldPoint);
+        var mouseMode = active && overTable ? Input.MouseModeEnum.Hidden : Input.MouseModeEnum.Visible;
+        if (Input.MouseMode != mouseMode) Input.MouseMode = mouseMode;
+        if (!active) _audio.StopSwing();
         if (active)
         {
             Herd.Advance(dt);
             Bench.Tick(dt);
-            if (Session.Stamina > 0 && Bench.TryWorldPosition(_pointerPosition, out var worldPoint) &&
+            if (Session.Stamina > 0 && overTable &&
                 _hammer.Begin(_pointerPosition))
+            {
                 _strikePoint = worldPoint;
+                _audio.PlaySwing();
+            }
             if (_hammer.Advance(dt, Session.RecoveryReduction) &&
                 Session.TrySwing(Herd.Targets(_strikePoint, Bench.Radius), out var result, out int coins))
             {
                 Herd.Apply(result!);
-                Bench.Impact(_strikePoint, result!, coins);
-                _audio.Play(result!.HitCount, coins);
+                Bench.Impact(_strikePoint, result!);
+                _audio.PlayImpact(result!);
+                var impactPoint = _strikePoint;
+                Interface.Hud.ShowImpact(() => Bench.ScreenPosition(impactPoint), result!, coins);
                 Refresh();
                 if (Session.Stamina == 0) _settleDelay = .75f;
             }

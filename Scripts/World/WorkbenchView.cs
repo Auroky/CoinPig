@@ -60,15 +60,16 @@ public partial class WorkbenchView : Node2D, IWorkbench
         QueueRedraw();
     }
 
-    public void Impact(System.Numerics.Vector2 point, SwingResult strike, int coins)
+    public void Impact(System.Numerics.Vector2 point, SwingResult strike)
     {
         foreach (var hit in strike.Targets)
         {
+            var pig = _pigs.FirstOrDefault(p => ReferenceEquals(p.State, hit.Pig));
+            if (pig == null) continue;
             _flashes[hit.Pig] = .22f;
-            var pig = _pigs.First(p => ReferenceEquals(p.State, hit.Pig));
             if (hit.Result.Destroyed) _effects.Break(ScreenPosition(pig), PigPainter.Look(hit.Pig.Definition.Id).Body);
         }
-        _effects.Strike(ScreenPosition(point), Radius * UnitScale, strike.DestroyedCount, strike.HitCount, coins);
+        _effects.Strike(ScreenPosition(point), Radius * UnitScale);
     }
 
     public void Present() => QueueRedraw();
