@@ -3,18 +3,28 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 
-/// <summary>挥动、落锤、碎裂和金币采用独立声部，连续命中时允许短尾音重叠。</summary>
+/// <summary>
+/// 将已结算结果映射为挥动、命中、碎裂和金币声部；短尾音可重叠，资源由本节点清理。
+/// </summary>
 public partial class ImpactAudio : AudioStreamPlayer
 {
     public IPigAppearanceSource Appearances { private get; set; } = new PigRoster(Array.Empty<PigArchetype>());
     public EquipmentSounds Sounds { get; init; } = EquipmentSounds.CreateDefault();
     internal string WeaponCue { get; private set; } = "hammer";
     internal string LastImpactCue { get; private set; } = "";
+
     internal AudioStreamWav ImpactClip(string cue) => VoiceFor(cue).Impact;
+
     internal AudioStream? EffectStream => _effect.Stream;
+
     private readonly List<AudioStreamWav> _clips = new();
-    private AudioStreamPlayer _air = null!, _crack = null!, _coins = null!, _effect = null!;
-    private AudioStreamWav _empty = null!, _ceramic = null!, _metal = null!;
+    private AudioStreamPlayer _air = null!;
+    private AudioStreamPlayer _crack = null!;
+    private AudioStreamPlayer _coins = null!;
+    private AudioStreamPlayer _effect = null!;
+    private AudioStreamWav _empty = null!;
+    private AudioStreamWav _ceramic = null!;
+    private AudioStreamWav _metal = null!;
     private readonly Dictionary<string, (AudioStreamWav Swing, AudioStreamWav Impact)> _toolVoices = new();
 
     public override void _Ready()
@@ -25,8 +35,11 @@ public partial class ImpactAudio : AudioStreamPlayer
         _coins = Voice(-10, 4);
         _effect = Voice(-4, 3);
         foreach (var entry in Sounds.All)
+        {
             _toolVoices[entry.Key] = (MakeClip(entry.Value.Swing.Seconds, entry.Value.Swing.Sample),
-                MakeClip(entry.Value.Impact.Seconds, entry.Value.Impact.Sample));
+                        MakeClip(entry.Value.Impact.Seconds, entry.Value.Impact.Sample));
+        }
+
         _air.Stream = VoiceFor(WeaponCue).Swing;
         _empty = MakeClip(0.15, (t, noise) => Math.Sin(2 * Math.PI * 145 * t) * Math.Exp(-t * 32) * 0.28 + noise * Math.Exp(-t * 75) * 0.13);
         _ceramic = MakeClip(0.29, (t, noise) =>
@@ -41,7 +54,11 @@ public partial class ImpactAudio : AudioStreamPlayer
             for (int i = 0; i < 3; i++)
             {
                 double age = t - 0.12 - i * 0.065;
-                if (age < 0) continue;
+                if (age < 0)
+                {
+                    continue;
+                }
+
                 double pitch = 980 * Math.Pow(1.25, i);
                 wave += (Math.Sin(2 * Math.PI * pitch * age) + 0.3 * Math.Sin(2 * Math.PI * pitch * 2.73 * age)) *
                     Math.Min(1, age * 900) * Math.Exp(-age * 25) * 0.22;
@@ -58,13 +75,16 @@ public partial class ImpactAudio : AudioStreamPlayer
     }
 
     public void PlaySwing() => _air.Play();
+
     private (AudioStreamWav Swing, AudioStreamWav Impact) VoiceFor(string cue) =>
         _toolVoices.TryGetValue(cue, out var voice) ? voice : _toolVoices["hammer"];
+
     public void SetWeapon(WeaponLoadout weapon)
     {
         WeaponCue = weapon.Weapon.AudioCue;
         _air.Stream = VoiceFor(WeaponCue).Swing;
     }
+
     public void StopSwing() => _air.Stop();
 
     public void PlayImpact(SwingResult result)
@@ -75,6 +95,7 @@ public partial class ImpactAudio : AudioStreamPlayer
         Play();
         PlayDebris(result);
     }
+
     public void PlayEffect(EffectOutcome effect)
     {
         LastImpactCue = effect.AudioCue;
@@ -82,9 +103,11 @@ public partial class ImpactAudio : AudioStreamPlayer
         _effect.Play();
         PlayDebris(effect.Strike);
     }
+
     private void PlayDebris(SwingResult result)
     {
-        int broken = result.DestroyedCount, hits = result.HitCount;
+        int broken = result.DestroyedCount;
+        int hits = result.HitCount;
         bool metalHit = hits > 0 && result.Targets.All(hit => Appearances.GetAppearance(hit.Pig.Definition.Id).Metal);
         if (hits > 0)
         {
@@ -108,6 +131,7 @@ public partial class ImpactAudio : AudioStreamPlayer
         _effect.Stop();
     }
 
+    /// <summary>以固定噪声种子生成单声道16位PCM，使用淡入淡出包络避免片段边缘爆音。</summary>
     private AudioStreamWav MakeClip(double seconds, Func<double, double, double> sample)
     {
         const int rate = 22050;
@@ -125,9 +149,14 @@ public partial class ImpactAudio : AudioStreamPlayer
         _clips.Add(clip);
         return clip;
     }
+
     public override void _ExitTree()
     {
-        foreach (var clip in _clips) clip.Dispose();
+        foreach (var clip in _clips)
+        {
+            clip.Dispose();
+        }
+
         _clips.Clear();
     }
 }

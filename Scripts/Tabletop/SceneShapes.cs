@@ -1,5 +1,8 @@
 using Godot;
 
+/// <summary>
+/// 基础三维几何体的节点构建工具，统一设置位置、尺寸与材质。
+/// </summary>
 public static class SceneShapes
 {
     public static MeshInstance3D Mesh(Node3D parent, Mesh mesh, Vector3 position, Material material)

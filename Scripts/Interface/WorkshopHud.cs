@@ -2,26 +2,47 @@ using Godot;
 using System;
 using static WorkshopStyle;
 
+/// <summary>
+/// 布局并刷新局内信息，以及击中、金币到账等短时提示；不执行经济结算。
+/// </summary>
 public partial class WorkshopHud : Control
 {
     public event Action? EndDay, Pause, Ledger;
-    private Label _round = null!, _wallet = null!, _score = null!, _hint = null!, _impact = null!;
-    private PanelContainer _roundPanel = null!, _walletPanel = null!, _scorePanel = null!, _hintPanel = null!;
-    private Button _end = null!, _ledger = null!, _pause = null!;
+
+    private Label _round = null!;
+    private Label _wallet = null!;
+    private Label _score = null!;
+    private Label _hint = null!;
+    private Label _impact = null!;
+    private PanelContainer _roundPanel = null!;
+    private PanelContainer _walletPanel = null!;
+    private PanelContainer _scorePanel = null!;
+    private PanelContainer _hintPanel = null!;
+    private Button _end = null!;
+    private Button _ledger = null!;
+    private Button _pause = null!;
     private Tween? _walletTween;
     private Func<Vector2>? _impactAnchor;
-    private float _impactLeft, _impactAge;
-    private int _lastBroken, _bestBroken;
+    private float _impactLeft;
+    private float _impactAge;
+    private int _lastBroken;
+    private int _bestBroken;
     private bool _combo;
+
     public string HintText => _hint.Text;
     public Vector2 WalletAnchor => _wallet.GetGlobalRect().GetCenter();
 
     public override void _Ready()
     {
         MouseFilter = MouseFilterEnum.Ignore;
-        _round = Label("", 22, Brass); _wallet = Label("", 24, Brass); _score = Label("", 22);
+        _round = Label("", 22, Brass);
+        _wallet = Label("", 24, Brass);
+        _score = Label("", 22);
         _hint = Label("", 18, Muted);
-        _roundPanel = Pill(_round); _walletPanel = Pill(_wallet); _scorePanel = Pill(_score); _hintPanel = Pill(_hint, 10);
+        _roundPanel = Pill(_round);
+        _walletPanel = Pill(_wallet);
+        _scorePanel = Pill(_score);
+        _hintPanel = Pill(_hint, 10);
         _end = Button("提前收工  [E]", () => EndDay?.Invoke(), "EndDay", false, true);
         _ledger = Button("查看账单  [B]", () => Ledger?.Invoke(), "Ledger", false, true);
         _pause = Button("暂停  [Esc]", () => Pause?.Invoke(), "Pause", false, true);
@@ -30,7 +51,11 @@ public partial class WorkshopHud : Control
         _impact.AddThemeColorOverride("font_outline_color", new("57382a"));
         _impact.AddThemeConstantOverride("outline_size", 7);
         _impact.Hide();
-        foreach (var node in new Control[] { _end, _ledger, _pause, _impact }) AddChild(node);
+        foreach (var node in new Control[] { _end, _ledger, _pause, _impact })
+        {
+            AddChild(node);
+        }
+
         Resized += Arrange;
         Arrange();
         ResetFeedback();
@@ -44,17 +69,21 @@ public partial class WorkshopHud : Control
         panel.AddThemeStyleboxOverride("panel", style);
         label.HorizontalAlignment = HorizontalAlignment.Center;
         label.VerticalAlignment = VerticalAlignment.Center;
-        panel.AddChild(label); AddChild(panel); return panel;
+        panel.AddChild(label);
+        AddChild(panel);
+        return panel;
     }
 
     private static void Place(Control node, float x, float y, float width, float height)
     {
-        node.Position = new(x, y); node.Size = new(width, height);
+        node.Position = new(x, y);
+        node.Size = new(width, height);
     }
 
     private void Arrange()
     {
-        float w = Size.X, h = Size.Y;
+        float w = Size.X;
+        float h = Size.Y;
         Place(_roundPanel, 35, 28, 340, 58);
         Place(_scorePanel, w / 2 - 190, 28, 380, 58);
         Place(_walletPanel, w - 280, 28, 245, 58);
@@ -77,7 +106,11 @@ public partial class WorkshopHud : Control
             string due = remaining <= 0 ? "今天" : remaining == 1 ? "明天" : $"{remaining} 天后";
             _ledger.Text = $"租金 ¥{bill.Amount} · {due}  [B]";
         }
-        else _ledger.Text = "租金已缴清 · 查看  [B]";
+        else
+        {
+            _ledger.Text = "租金已缴清 · 查看  [B]";
+        }
+
         _hint.Text = $"{state.WeaponName} Lv.{state.WeaponLevel} · 伤害 {state.Damage} · 耗能 {state.AttackCost} · 自动攻击";
     }
 
@@ -103,9 +136,14 @@ public partial class WorkshopHud : Control
         ShowImpact(anchor, effect.Strike, effect.Coins);
         _impact.Text = effect.Name + "\n" + _impact.Text;
     }
+
     public void PulseWallet()
     {
-        if (!IsVisibleInTree()) return;
+        if (!IsVisibleInTree())
+        {
+            return;
+        }
+
         _walletTween?.Kill();
         _wallet.PivotOffset = _wallet.Size / 2;
         _wallet.Scale = Vector2.One * 1.07f;
@@ -121,14 +159,20 @@ public partial class WorkshopHud : Control
         _lastBroken = _bestBroken = 0;
         _impactLeft = 0;
         _impact.Hide();
-        _wallet.Scale = Vector2.One; _wallet.Modulate = Colors.White;
+        _wallet.Scale = Vector2.One;
+        _wallet.Modulate = Colors.White;
     }
 
     public override void _Process(double delta)
     {
-        if (_impactLeft <= 0 || _impactAnchor == null) { _impact.Hide(); return; }
+        if (_impactLeft <= 0 || _impactAnchor == null)
+        {
+            _impact.Hide();
+            return;
+        }
         float dt = (float)delta;
-        _impactAge += dt; _impactLeft = Mathf.Max(0, _impactLeft - dt);
+        _impactAge += dt;
+        _impactLeft = Mathf.Max(0, _impactLeft - dt);
         float height = (_combo ? 140 : 100) + _impactAge * 35;
         var position = _impactAnchor() - new Vector2(_impact.Size.X / 2, height);
         position.X = Mathf.Clamp(position.X, 12, Size.X - _impact.Size.X - 12);

@@ -2,14 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 
+/// <summary>
+/// 单只猪的出生参数。路线使用桌面平面坐标；BodyRadius 为零时不参与体积避让。
+/// </summary>
 public sealed record PigSpawn(PigDefinition Definition, IMotionPath Path, float BodyRadius = 0, float BodyHalfLength = 0);
 
-/// <summary>Starting population and reusable route configurations.</summary>
+/// <summary>
+/// 可复用的桌面路线工厂。此处定义路径形状，运动状态与避让由 PigMotion 和 PigHerd 管理。
+/// </summary>
 public static class HerdLayout
 {
     private static void ValidateSide(float side)
     {
-        if (side != 1 && side != -1) throw new ArgumentOutOfRangeException(nameof(side));
+        if (side != 1 && side != -1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(side));
+        }
     }
 
     public static IMotionPath Middle(float side)

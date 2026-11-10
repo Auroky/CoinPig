@@ -1,7 +1,13 @@
 using Godot;
 
+/// <summary>
+/// 一次二维绘制使用的颜色和材质标记。
+/// </summary>
 public sealed record PigLook(Color Body, Color Nose, bool Metal);
 
+/// <summary>
+/// 绘制单只猪和耐久提示，只读取运动与生命状态。高耐久使用血条，避免圆点超出造型。
+/// </summary>
 public static class PigPainter
 {
     public static void Draw(Node2D canvas, PigMotion pig, Vector2 position, float scale, float flash, PigAppearance appearance)
@@ -42,7 +48,9 @@ public static class PigPainter
         else if (pig.State.Definition.MaxHealth > 1)
         {
             for (int i = 0; i < pig.State.Definition.MaxHealth; i++)
+            {
                 canvas.DrawCircle(new(-(pig.State.Definition.MaxHealth - 1) * 4.5f + i * 9, 33), 3, i < pig.State.Health ? new("d9bd7d") : new Color(0, 0, 0, .3f));
+            }
         }
         canvas.DrawSetTransform(Vector2.Zero);
     }

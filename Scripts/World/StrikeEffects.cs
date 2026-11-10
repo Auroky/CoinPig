@@ -2,18 +2,24 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+/// <summary>
+/// 二维工作台的受击、碎片和金币效果，生命周期与规则结算分离。
+/// </summary>
 public partial class StrikeEffects : Node2D
 {
     private sealed class Particle
     {
-        public Vector2 Position, Velocity;
+        public Vector2 Position;
+        public Vector2 Velocity;
         public Color Color;
         public float Life;
         public bool Coin;
     }
+
     private readonly Random _random = new();
     private readonly List<Particle> _particles = new();
-    private float _ripple, _radius;
+    private float _ripple;
+    private float _radius;
     private Vector2 _point;
 
     public override void _Ready()
@@ -36,7 +42,9 @@ public partial class StrikeEffects : Node2D
             _particles.Add(new Particle { Position = at, Velocity = Vector2.FromAngle(angle) * _random.Next(100, 320), Color = color, Life = .65f });
         }
         for (int i = 0; i < 4; i++)
+        {
             _particles.Add(new Particle { Position = at, Velocity = new(_random.Next(-170, 170), _random.Next(-230, -70)), Color = WorkshopStyle.Brass, Life = 1, Coin = true });
+        }
     }
 
     public void Strike(Vector2 point, float radius)
@@ -53,8 +61,14 @@ public partial class StrikeEffects : Node2D
         {
             particle.Life -= delta;
             if (particle.Coin && particle.Life < .6f)
+            {
                 particle.Velocity = particle.Position.DirectionTo(new(GetViewportRect().Size.X - 100, 60)) * 1000;
-            else particle.Velocity *= Mathf.Pow(.2f, delta);
+            }
+            else
+            {
+                particle.Velocity *= Mathf.Pow(.2f, delta);
+            }
+
             particle.Position += particle.Velocity * delta;
         }
         _particles.RemoveAll(p => p.Life <= 0);
@@ -76,7 +90,10 @@ public partial class StrikeEffects : Node2D
                 DrawCircle(particle.Position, 6, color);
                 DrawArc(particle.Position, 3.5f, 0, Mathf.Tau, 12, new("8b642b"), 1);
             }
-            else DrawRect(new(particle.Position, new(7, 5)), color);
+            else
+            {
+                DrawRect(new(particle.Position, new(7, 5)), color);
+            }
         }
     }
 }

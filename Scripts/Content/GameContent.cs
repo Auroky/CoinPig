@@ -1,22 +1,33 @@
 using System;
 using System.Collections.Generic;
 
-/// <summary>Composition root: immutable content creates isolated session and herd instances.</summary>
+/// <summary>
+/// 一份内容配置对应一个游戏工厂；每次创建会话或猪群都返回独立的可变状态。
+/// </summary>
 public sealed class GameContent : IGameFactory
 {
     public SessionDefinition Definition { get; }
     public PigRoster Pigs { get; }
     public SwingTiming Timing { get; }
+
     public GameContent(SessionDefinition definition, PigRoster pigs, SwingTiming? timing = null)
     {
-        ArgumentNullException.ThrowIfNull(definition); ArgumentNullException.ThrowIfNull(pigs);
-        Definition = definition; Pigs = pigs; Timing = timing ?? new();
+        ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(pigs);
+        Definition = definition;
+        Pigs = pigs;
+        Timing = timing ?? new();
         _ = new StrikeCycle(Timing);
     }
+
     public GameSession CreateSession() => new(Definition);
+
     public PigHerd CreateHerd(int shift = 1) => new(Pigs.SpawnsForShift(shift));
 }
 
+/// <summary>
+/// 默认内容的组装入口。核心类通过参数接收配置，不反向查询此静态入口。
+/// </summary>
 public static class DefaultGame
 {
     public static IReadOnlyList<ISwingRewardRule> RewardRules { get; } = Array.AsReadOnly(new ISwingRewardRule[]
@@ -33,9 +44,16 @@ public static class DefaultGame
         IReadOnlyList<Bill>? bills = null, GameTuning? tuning = null,
         IReadOnlyList<ISwingRewardRule>? rewardRules = null, WeaponDefinition? startingWeapon = null,
         IRentContinuation? rentContinuation = null) =>
-        new(tuning ?? BalanceContent.Tuning, bills ?? BalanceContent.Bills, products ?? EquipmentContent.Products,
-            skills ?? SkillContent.Nodes, perks ?? PerkContent.Cards, rewardRules ?? RewardRules, startingWeapon ?? EquipmentContent.Hammer,
-            rentContinuation);
+        new(
+            tuning ?? BalanceContent.Tuning,
+            bills ?? BalanceContent.Bills,
+            products ?? EquipmentContent.Products,
+            skills ?? SkillContent.Nodes,
+            perks ?? PerkContent.Cards,
+            rewardRules ?? RewardRules,
+            startingWeapon ?? EquipmentContent.Hammer,
+            rentContinuation
+        );
 
     public static GameSession CreateSession(Random? random = null, IReadOnlyList<ShopProduct>? products = null,
         IReadOnlyList<SkillDefinition>? skills = null, IReadOnlyList<PerkCard>? perks = null) =>

@@ -2,12 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-/// <summary>Owns the available choices and the accumulated effects of selected perks.</summary>
+/// <summary>
+/// 管理本局拥有的随机能力、待选列表和累计加成；新会话创建全新状态。
+/// </summary>
 public sealed class PerkProgress
 {
     private readonly IReadOnlyList<PerkCard> _catalog;
     private readonly Random _random;
     private readonly HashSet<string> _owned = new();
+
     public Bonus TotalBonus { get; private set; } = new();
     public IReadOnlyList<PerkCard> Offers { get; private set; } = Array.Empty<PerkCard>();
 
@@ -19,7 +22,10 @@ public sealed class PerkProgress
         if (snapshot.Any(card => card == null || card.Bonus == null ||
             !card.Bonus.IsValid || string.IsNullOrWhiteSpace(card.Id)) ||
             snapshot.Select(card => card.Id).Distinct().Count() != snapshot.Length)
+        {
             throw new ArgumentException("Perks must have unique identities and nonnegative finite bonuses.", nameof(cards));
+        }
+
         _catalog = Array.AsReadOnly(snapshot);
         _random = random;
     }
@@ -35,7 +41,11 @@ public sealed class PerkProgress
     public bool Choose(string kind)
     {
         var card = Offers.FirstOrDefault(offer => offer.Id == kind);
-        if (card == null || Has(kind)) return false;
+        if (card == null || Has(kind))
+        {
+            return false;
+        }
+
         var updated = TotalBonus.Add(card.Bonus);
         _owned.Add(kind);
         TotalBonus = updated;

@@ -69,7 +69,9 @@ internal static class EquipmentChecks
         int balance = session.Wallet;
         check(session.TryBuy("Chainsaw", 0).Status == PurchaseStatus.Locked && session.Wallet == balance,
             "chainsaw prerequisites are enforced by the purchase command before charging");
-        check(session.GetOffers().Single(o => o.Product.Id == "Chainsaw").LockReason.Contains("Lv.2"), "locked offers explain their prerequisite levels");
+        check(session.GetOffers().Single(o => o.Product.Id == "Chainsaw").MissingRequirements!
+            .Any(requirement => requirement.ProductId == "Rim" && requirement.Level == 2),
+            "locked offers expose prerequisite IDs and levels independently of UI wording");
         check(session.TryEquip("Chainsaw").Status == EquipStatus.NotOwned && session.Wallet == balance, "unowned weapons cannot be equipped for free");
         check(session.TryBuy("Rim", 0).Succeeded && session.TryBuy("Rim", 1).Succeeded && session.TryBuy("Stamina", 0).Succeeded,
             "stage-one equipment uses the existing upgrade workflow");

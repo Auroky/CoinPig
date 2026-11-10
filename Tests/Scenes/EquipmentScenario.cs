@@ -47,6 +47,9 @@ internal static class EquipmentScenario
             End(g); Press(g, "Equipment");
             Check(g.Interface.FindChildren("Buy_*", "Button", true, false).OfType<Button>().Count(b => b.IsVisibleInTree()) == 12,
                 "shop renders all four product columns and three upgrade levels");
+            var catalog = g.Session.GetOffers();
+            Check(GameText.LockReason(catalog.Single(offer => offer.Product.Id == "Chainsaw"), catalog) == "加宽锤面 Lv.2、共振护腕 Lv.1",
+                "the UI formats prerequisite data without moving unlock rules out of the core");
             int wallet = g.Session.Wallet;
             Press(g, "Buy_Grinder");
             Check(g.Session.Wallet == wallet && g.Interface.Menu.NoticeText.Contains("解锁"), "locked final-stage equipment explains prerequisites without charging");

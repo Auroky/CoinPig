@@ -4,28 +4,40 @@ using System.Linq;
 using System.Collections.Generic;
 using static WorkshopStyle;
 
-public enum MenuPage { None, Title, Receipt, Equipment, Skills, Reward, Ledger, Pause, Help, EndDay, Restart }
+/// <summary>
+/// 菜单导航状态，用于返回、暂停和收工确认，不替代核心会话阶段。
+/// </summary>
+public enum MenuPage
+{
+    None, Title, Receipt, Equipment, Skills, Reward, Ledger, Pause, Help, EndDay, Restart
+}
 
-/// <summary>Owns menu navigation and display. It emits commands without changing a game session.</summary>
+/// <summary>
+/// 管理菜单页面、布局和返回路径。接收快照与只读报价，通过事件提交操作意图。
+/// </summary>
 public partial class WorkshopMenu : Control
 {
     public IReadOnlyList<PigDefinition> PigDefinitions { get; set; } = Array.Empty<PigDefinition>();
     public bool SpatialCatalogs { get; set; }
+
     public event Action? Start, EndDay, Restart, Resume, Equipment, Skills, Fullscreen, Quit;
     public event Action<string, int>? Purchase;
     public event Action<string>? Equip;
     public event Action<string>? Learn;
     public event Action<string>? Choose;
+
     public MenuPage Page { get; private set; }
     public bool IsOpen => Page != MenuPage.None;
     public string NoticeText => _notice?.Text ?? "";
+
     private ColorRect _shade = null!;
     private VBoxContainer? _body;
     private PanelContainer? _panel;
     private Label? _notice;
     private Action? _back;
     private Vector2 _bodySize;
-    private bool _titleLayout, _fullGallery;
+    private bool _titleLayout;
+    private bool _fullGallery;
 
     public override void _Ready()
     {
@@ -52,15 +64,21 @@ public partial class WorkshopMenu : Control
         _fullGallery = false;
         _bodySize = size;
         _panel = new PanelContainer();
-        var surface = Surface(new Color(.10f,.075f,.055f,.86f), new Color(.68f,.49f,.27f,.42f), 30);
-        if (page == MenuPage.Reward) { surface.BgColor = Colors.Transparent; surface.SetBorderWidthAll(0); }
+        var surface = Surface(new Color(.10f, .075f, .055f, .86f), new Color(.68f, .49f, .27f, .42f), 30);
+        if (page == MenuPage.Reward)
+        {
+            surface.BgColor = Colors.Transparent;
+            surface.SetBorderWidthAll(0);
+        }
         surface.SetCornerRadiusAll(16);
-        surface.ShadowColor = new Color(0,0,0,.36f); surface.ShadowSize=page == MenuPage.Reward ? 0 : 20; surface.ShadowOffset=new(0,8);
+        surface.ShadowColor = new Color(0, 0, 0, .36f);
+        surface.ShadowSize = page == MenuPage.Reward ? 0 : 20;
+        surface.ShadowOffset = new(0, 8);
         _panel.AddThemeStyleboxOverride("panel", surface);
         AddChild(_panel);
         _panel.Resized += Arrange;
         _body = Column(_panel, 18);
-        // Wrapped text can initially report a tall minimum before the container receives its width.
+        // 自动换行文字在获得容器宽度前可能报告过高的最小尺寸，延迟到布局完成后重新定位。
         _body.MinimumSizeChanged += () => Callable.From(Arrange).CallDeferred();
         var title = Label(heading, _titleLayout ? 46 : 36, Brass);
         title.HorizontalAlignment = HorizontalAlignment.Center;
@@ -75,7 +93,11 @@ public partial class WorkshopMenu : Control
 
     private void Arrange()
     {
-        if (_panel == null) return;
+        if (_panel == null)
+        {
+            return;
+        }
+
         _panel.Size = _fullGallery ? Size : _bodySize;
         _panel.Position = _fullGallery ? Vector2.Zero : new((Size.X - _panel.Size.X) / 2, Mathf.Max(12, (Size.Y - _panel.Size.Y) / 2));
     }
@@ -94,14 +116,22 @@ public partial class WorkshopMenu : Control
 
     public bool GoBack()
     {
-        if (_back == null) return false;
+        if (_back == null)
+        {
+            return false;
+        }
+
         _back();
         return true;
     }
 
     public void Notify(string message)
     {
-        if (_notice == null) return;
+        if (_notice == null)
+        {
+            return;
+        }
+
         _notice.Text = message;
         _notice.AddThemeColorOverride("font_color", Brass);
     }
@@ -142,7 +172,10 @@ public partial class WorkshopMenu : Control
         Rule(body);
         AddLedgerLine(body, "余额", $"¥ {state.Wallet}", 30);
         if (!failed && state.NextBill is Bill next)
+        {
             body.AddChild(Label($"下次租金：第 {next.Shift} 天 ¥{next.Amount} · 还需准备 ¥{Math.Max(0, next.Amount - state.Wallet)}", 18, Muted, true));
+        }
+
         if (!failed && !complete)
         {
             var row = Row(body);
@@ -152,8 +185,15 @@ public partial class WorkshopMenu : Control
             row.AddChild(shop);
             row.AddChild(skills);
         }
-        if (!failed) body.AddChild(Button(complete ? "进入无尽模式" : "开始下一天", () => Start?.Invoke(), "Next", true));
-        if (failed || complete) body.AddChild(Button("重新开始", () => Restart?.Invoke(), "Restart", failed));
+        if (!failed)
+        {
+            body.AddChild(Button(complete ? "进入无尽模式" : "开始下一天", () => Start?.Invoke(), "Next", true));
+        }
+
+        if (failed || complete)
+        {
+            body.AddChild(Button("重新开始", () => Restart?.Invoke(), "Restart", failed));
+        }
     }
 
     private static HBoxContainer AddLedgerLine(Control parent, string label, string value, int size = 23)
@@ -196,8 +236,16 @@ public partial class WorkshopMenu : Control
                 content.AddChild(Label(skill.Name, 21));
                 content.AddChild(Label(skill.Description, 16, Muted, true));
                 if (skill.ParentId != null)
+                {
                     content.AddChild(Label("前置：" + (offers.FirstOrDefault(s => s.Skill.Id == skill.ParentId)?.Skill.Name ?? skill.ParentId), 14, Muted));
-                string label = offer.Status switch { SkillStatus.Learned => "已学会", SkillStatus.Locked => "未解锁", _ => $"学习 ¥{skill.Cost}" };
+                }
+
+                string label = offer.Status switch
+                {
+                    SkillStatus.Learned => "已学会",
+                    SkillStatus.Locked => "未解锁",
+                    _ => $"学习 ¥{skill.Cost}"
+                };
                 var button = Button(label, () => Learn?.Invoke(skill.Id), "Learn_" + skill.Id);
                 button.CustomMinimumSize = new(0, 36);
                 button.AddThemeFontSizeOverride("font_size", 17);
@@ -223,7 +271,7 @@ public partial class WorkshopMenu : Control
         _panel.AddChild(gallery);
         _panel.MoveChild(gallery, 0);
         var bar = new PanelContainer();
-        var barStyle = Surface(new Color(.07f,.055f,.04f,.86f), null, 18);
+        var barStyle = Surface(new Color(.07f, .055f, .04f, .86f), null, 18);
         barStyle.SetCornerRadiusAll(0);
         bar.AddThemeStyleboxOverride("panel", barStyle);
         body.AddChild(bar);
@@ -234,14 +282,17 @@ public partial class WorkshopMenu : Control
         var equipmentTab = Button("商店", () => Equipment?.Invoke(), "EquipmentTab");
         var skillTab = Button("技能树", () => Skills?.Invoke(), "SkillsTab");
         equipmentTab.CustomMinimumSize = skillTab.CustomMinimumSize = new(150, 50);
-        equipmentTab.Disabled = !training; skillTab.Disabled = training;
-        StyleTab(equipmentTab); StyleTab(skillTab);
-        tabs.AddChild(equipmentTab); tabs.AddChild(skillTab);
+        equipmentTab.Disabled = !training;
+        skillTab.Disabled = training;
+        StyleTab(equipmentTab);
+        StyleTab(skillTab);
+        tabs.AddChild(equipmentTab);
+        tabs.AddChild(skillTab);
         var balance = Label($"金币 ¥{state.Wallet}", 22, Brass);
         balance.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         balance.VerticalAlignment = VerticalAlignment.Center;
         tabs.AddChild(balance);
-        tabs.AddChild(Button("查看租金", () => ShowLedger(state, () => { if (training) Skills?.Invoke(); else Equipment?.Invoke(); }), "ViewRent", false, true));
+        tabs.AddChild(Button("查看租金", () => ShowLedger(state, () => { if (training) { Skills?.Invoke(); } else { Equipment?.Invoke(); } }), "ViewRent", false, true));
         tabs.AddChild(Button($"进入第 {state.Day + 1} 局", () => Start?.Invoke(), "Next", true, true));
         body.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore });
         var footer = new PanelContainer { CustomMinimumSize = new(0, 82) };
@@ -254,7 +305,15 @@ public partial class WorkshopMenu : Control
         gallery.Equip += id => Equip?.Invoke(id);
         gallery.Learn += id => Learn?.Invoke(id);
         gallery.Message += Notify;
-        if (training) gallery.ShowSkills(skills!); else gallery.ShowProducts(shop!);
+        if (training)
+        {
+            gallery.ShowSkills(skills!);
+        }
+        else
+        {
+            gallery.ShowProducts(shop!);
+        }
+
         Arrange();
     }
 
@@ -268,19 +327,27 @@ public partial class WorkshopMenu : Control
             button.CustomMinimumSize = new(0, 410);
             button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
             button.ClipContents = true;
-            var normal = Surface(new Color(.065f,.046f,.033f,.84f), new("ab773ab0"), 0);
+            var normal = Surface(new Color(.065f, .046f, .033f, .84f), new("ab773ab0"), 0);
             normal.SetCornerRadiusAll(12);
-            var hover = Surface(new Color(.28f,.18f,.075f,.90f), Brass, 0);
+            var hover = Surface(new Color(.28f, .18f, .075f, .90f), Brass, 0);
             hover.SetCornerRadiusAll(12);
-            hover.ShadowColor = new Color(.85f,.56f,.21f,.18f); hover.ShadowSize = 12;
+            hover.ShadowColor = new Color(.85f, .56f, .21f, .18f);
+            hover.ShadowSize = 12;
             button.AddThemeStyleboxOverride("normal", normal);
             button.AddThemeStyleboxOverride("hover", hover);
             row.AddChild(button);
             var margin = new MarginContainer { MouseFilter = MouseFilterEnum.Ignore };
-            button.AddChild(margin); margin.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-            foreach (string side in new[] { "left", "right", "top", "bottom" }) margin.AddThemeConstantOverride("margin_" + side, 22);
-            var column = Column(margin, 18); column.MouseFilter = MouseFilterEnum.Ignore;
-            var title = Label(card.Name, 27, Brass); title.HorizontalAlignment = HorizontalAlignment.Center;
+            button.AddChild(margin);
+            margin.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+            foreach (string side in new[] { "left", "right", "top", "bottom" })
+            {
+                margin.AddThemeConstantOverride("margin_" + side, 22);
+            }
+
+            var column = Column(margin, 18);
+            column.MouseFilter = MouseFilterEnum.Ignore;
+            var title = Label(card.Name, 27, Brass);
+            title.HorizontalAlignment = HorizontalAlignment.Center;
             column.AddChild(title);
             column.AddChild(new RewardEmblem { Emblem = card.Emblem, CustomMinimumSize = new(0, 160), MouseFilter = MouseFilterEnum.Ignore });
             Rule(column);
@@ -298,19 +365,36 @@ public partial class WorkshopMenu : Control
         var body = Open(MenuPage.Ledger, "租约", $"余额 ¥{state.Wallet}", new(650, 600), returnToPrevious);
         Rule(body);
         if (state.NextBill is Bill next)
+        {
             body.AddChild(Label($"下次：第 {next.Shift} 天 ¥{next.Amount} · 当前缺口 ¥{Math.Max(0, next.Amount - state.Wallet)}", 20, Brass, true));
-        var scroll = new ScrollContainer { Name = "RentScroll", CustomMinimumSize = new(0, 285), CustomMaximumSize = new(-1, 285),
-            SizeFlagsVertical = SizeFlags.Fill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
-            VerticalScrollMode = ScrollContainer.ScrollMode.Auto };
+        }
+
+        var scroll = new ScrollContainer
+        {
+            Name = "RentScroll",
+            CustomMinimumSize = new(0, 285),
+            CustomMaximumSize = new(-1, 285),
+            SizeFlagsVertical = SizeFlags.Fill,
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+            VerticalScrollMode = ScrollContainer.ScrollMode.Auto
+        };
         body.AddChild(scroll);
-        var rows = Column(scroll, 8); rows.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        var rows = Column(scroll, 8);
+        rows.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         Control? upcoming = null;
         foreach (var due in state.Schedule)
         {
             var line = AddLedgerLine(rows, $"{(due.Renewal ? "续租 " : "")}第 {due.Day} 天  ·  ¥{due.Amount}", GameText.Deadline(due));
-            if (!due.Paid && upcoming == null) upcoming = line;
+            if (!due.Paid && upcoming == null)
+            {
+                upcoming = line;
+            }
         }
-        if (upcoming != null) Callable.From(() => { if (GodotObject.IsInstanceValid(scroll)) scroll.EnsureControlVisible(upcoming); }).CallDeferred();
+        if (upcoming != null)
+        {
+            Callable.From(() => { if (GodotObject.IsInstanceValid(scroll)) { scroll.EnsureControlVisible(upcoming); } }).CallDeferred();
+        }
+
         body.AddChild(Label("第 10 局结清房租后进入无尽模式，不再收租。", 17, Muted, true));
         Rule(body);
         Back(body, returnToPrevious, back == null ? "返回营业" : "返回工坊");
@@ -349,6 +433,3 @@ public partial class WorkshopMenu : Control
         Back(body, back);
     }
 }
-
-
-

@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 
-/// <summary>Snapshot readers do not receive purchase, combat or lifecycle commands.</summary>
+/// <summary>
+/// 界面需要的会话只读信息；不暴露购买、攻击或推进回合的方法。
+/// </summary>
 public interface ISessionView
 {
     ShiftPhase Phase { get; }
@@ -20,7 +22,9 @@ public interface ISessionView
     IReadOnlyList<RentDue> GetRentSchedule();
 }
 
-/// <summary>Each call creates fresh mutable state from the same immutable content.</summary>
+/// <summary>
+/// 创建独立会话与猪群的能力。相同内容可由不同表现复用，每次创建不共享可变状态。
+/// </summary>
 public interface IGameFactory
 {
     GameSession CreateSession();

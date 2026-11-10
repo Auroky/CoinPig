@@ -1,9 +1,13 @@
 using Godot;
 
+/// <summary>
+/// 绘制二维木桌、边框和装饰背景，不保存玩法状态。
+/// </summary>
 public partial class WorkbenchBackdrop : Node2D
 {
     private ColorRect _wood = null!;
     private Vector2 _size;
+
     public override void _Ready()
     {
         ZIndex = -5;
@@ -17,16 +21,20 @@ public partial class WorkbenchBackdrop : Node2D
         GetViewport().SizeChanged += Resize;
         Resize();
     }
+
     public override void _ExitTree() => GetViewport().SizeChanged -= Resize;
+
     private void Resize()
     {
         _size = GetViewportRect().Size;
         _wood.Size = _size;
         QueueRedraw();
     }
+
     public override void _Draw()
     {
-        Color iron = new("25261f"), edge = new("585344");
+        Color iron = new("25261f");
+        Color edge = new("585344");
         DrawRect(new(0, 0, _size.X, 18), iron);
         DrawRect(new(0, _size.Y - 21, _size.X, 21), iron);
         DrawLine(new(0, 18), new(_size.X, 18), edge, 2);
@@ -49,7 +57,7 @@ public partial class WorkbenchBackdrop : Node2D
             float x = 60 + i * 20;
             DrawLine(new(x, y), new(x, y + (i % 5 == 0 ? 11 : 5)), new Color(.8f, .7f, .48f, .2f), 1);
         }
-        // Chalk wear and a small ring left by a cup are part of the bench surface.
+        // 粉笔磨痕与杯底水印作为桌面装饰绘制，不创建可交互对象。
         DrawArc(new(_size.X - 115, _size.Y - 220), 45, .3f, 5.5f, 60, new Color(.75f, .64f, .45f, .08f), 4, true);
         DrawArc(new(_size.X - 118, _size.Y - 222), 43, 2, 6, 40, new Color(.75f, .64f, .45f, .06f), 2, true);
     }

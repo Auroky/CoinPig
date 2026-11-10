@@ -1,29 +1,42 @@
 using Godot;
 using System.Collections.Generic;
 
-/// <summary>Mesh pose, damage feedback and respawn appearance, driven by the shared model.</summary>
+/// <summary>
+/// 根据共享猪状态绘制造型、朝向、步态、伤痕和重生动画；不负责路径推进或碰撞计算。
+/// </summary>
 public partial class PigModel : Node3D
 {
     private PigMotion _motion = null!;
     private PigAppearance _finish = null!;
     private TabletopMaterials _materials = null!;
-    private Node3D _body = null!, _key = null!, _cracks = null!;
+    private Node3D _body = null!;
+    private Node3D _key = null!;
+    private Node3D _cracks = null!;
     private readonly Node3D[] _legs = new Node3D[4];
     private Label3D _healthLabel = null!;
     private Font _font = null!;
     private int _index;
-    private float _hurtTime, _healthSeconds, _spawnAge = .16f;
+    private float _hurtTime;
+    private float _healthSeconds;
+    private float _spawnAge = .16f;
     private bool _wasActive;
+
     public PigMotion Motion => _motion;
     public PigState State => _motion.State;
     public Color Glaze { get; private set; }
     public Color Interior => new(_finish.Interior);
     public float BodyScale => _finish.Scale;
+
     private MeshInstance3D Mesh(Node3D parent, Mesh mesh, Vector3 at, Color color) => SceneShapes.Mesh(parent, mesh, at, _materials.Paint(color));
+
     private MeshInstance3D Box(Node3D parent, Vector3 at, Vector3 size, Color color) => SceneShapes.Box(parent, at, size, _materials.Paint(color));
+
     private MeshInstance3D Cylinder(Node3D parent, Vector3 at, float bottom, float top, float height, Color color, int sides = 8) => SceneShapes.Cylinder(parent, at, bottom, top, height, _materials.Paint(color), sides);
+
     private MeshInstance3D Beam(Node3D parent, Vector3 a, Vector3 b, float width, Color color) => SceneShapes.Beam(parent, a, b, width, _materials.Paint(color));
+
     private MeshInstance3D Oval(Node3D parent, Vector3 at, Vector3 radius, Color color) => SceneShapes.Ellipsoid(parent, at, radius, _materials.Paint(color));
+
     public void Assemble(PigMotion motion, int index, TabletopMaterials materials, PigAppearance appearance)
     {
         _index = index;
@@ -105,7 +118,10 @@ public partial class PigModel : Node3D
             new(-0.04f, 0.95f, -0.22f), new(0.11f, 0.91f, -0.29f), new(0.22f, 0.83f, -0.38f)
         };
         for (int i = 1; i < crack.Length; i++)
+        {
             Beam(_cracks, crack[i - 1], crack[i], 0.029f, new("303637"));
+        }
+
         _cracks.Hide();
     }
 
@@ -119,8 +135,10 @@ public partial class PigModel : Node3D
                 var plate = Box(_body, new(side * 0.465f, 0.54f, -0.12f), new(0.06f, 0.23f, 0.53f), darkMetal);
                 plate.RotationDegrees = new(0, 0, side * -6);
                 for (int i = 0; i < 3; i++)
+                {
                     Oval(_body, new(side * 0.501f, 0.60f, -0.32f + i * 0.20f),
                         new(0.032f, 0.035f, 0.032f), new("d1c29f"));
+                }
             }
         }
         if (_finish.Collar)
@@ -133,8 +151,16 @@ public partial class PigModel : Node3D
 
     public void Hit(DamageResult damage)
     {
-        if (!damage.WasHit) return;
-        if (damage.Destroyed) { _healthLabel.Hide(); return; }
+        if (!damage.WasHit)
+        {
+            return;
+        }
+
+        if (damage.Destroyed)
+        {
+            _healthLabel.Hide();
+            return;
+        }
         _hurtTime = .18f;
         _healthSeconds = 1.5f;
         _healthLabel.Text = $"耐久 {damage.RemainingHealth} / {State.Definition.MaxHealth}";
@@ -150,8 +176,13 @@ public partial class PigModel : Node3D
     public void Present()
     {
         Position = new(_motion.Position.X, 0, _motion.Position.Y);
+        // 使用域模型的朝向，与胶囊占位一致；不能再从渲染帧位移另算一个朝向。
         Rotation = new(0, Mathf.Atan2(_motion.Forward.X, _motion.Forward.Y), 0);
-        if (_motion.Active && !_wasActive) _spawnAge = 0;
+        if (_motion.Active && !_wasActive)
+        {
+            _spawnAge = 0;
+        }
+
         _wasActive = _motion.Active;
         float t = Mathf.Clamp(_spawnAge / .16f, 0, 1) - 1;
         float back = 1 + 2.70158f * t * t * t + 1.70158f * t * t;
@@ -162,7 +193,10 @@ public partial class PigModel : Node3D
         _body.Position = new(0, .045f * Mathf.Abs(Mathf.Sin(stride)), 0);
         _body.Rotation = new(Mathf.Sin(stride * 2) * .03f, 0, Mathf.Cos(stride) * .047f);
         for (int i = 0; i < _legs.Length; i++)
+        {
             _legs[i].Rotation = new(Mathf.Sin(stride + (i == 0 || i == 3 ? 0 : Mathf.Pi)) * .45f, 0, 0);
+        }
+
         _key.Rotation = new(0, 0, _motion.Time * 2.2f + _index);
         _healthLabel.Visible = _healthSeconds > 0 && _motion.Active && State.Health < State.Definition.MaxHealth;
         _cracks.Visible = _motion.Active && State.Health < State.Definition.MaxHealth;

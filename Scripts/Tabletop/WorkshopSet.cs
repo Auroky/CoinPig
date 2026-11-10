@@ -1,13 +1,22 @@
 using Godot;
 
+/// <summary>
+/// 创建桌面、灯光、摄像机和边缘摆件。场景装饰不改变经营或战斗规则。
+/// </summary>
 public sealed class WorkshopSet
 {
     private readonly TabletopMaterials _materials;
+
     private WorkshopSet(TabletopMaterials materials) => _materials = materials;
+
     public static Camera3D Build(Node3D root, TabletopMaterials materials) => new WorkshopSet(materials).BuildDesk(root);
+
     private MeshInstance3D Mesh(Node3D parent, Mesh mesh, Vector3 at, Color color) => SceneShapes.Mesh(parent, mesh, at, _materials.Paint(color));
+
     private MeshInstance3D Box(Node3D parent, Vector3 at, Vector3 size, Color color) => SceneShapes.Box(parent, at, size, _materials.Paint(color));
+
     private MeshInstance3D Cylinder(Node3D parent, Vector3 at, float bottom, float top, float height, Color color, int sides = 8) => SceneShapes.Cylinder(parent, at, bottom, top, height, _materials.Paint(color), sides);
+
     private MeshInstance3D Beam(Node3D parent, Vector3 a, Vector3 b, float width, Color color)
     {
         var beam = Box(parent, (a + b) / 2, new(width, a.DistanceTo(b), width), color);
@@ -61,7 +70,7 @@ public sealed class WorkshopSet
             var plank = Box(root, new(0, -0.065f, (i - 3.5f) * 1.57f), new(20, 0.13f, 1.563f), Colors.White);
             plank.MaterialOverride = _materials.Wood(palette[i], i * 8.31f);
         }
-        // Desk-edge props establish scale, leaving the running lanes open.
+        // 摆件放在桌边以建立比例感，中间区域留给猪群移动。
         Lamp(root, new(-7.66f, 0, -4.92f));
         Coffee(root, new(7.62f, 0, -4.88f));
         Papers(root, new(7.76f, 0, 4.82f));
@@ -103,8 +112,11 @@ public sealed class WorkshopSet
         Box(stack, new(0, 0.055f, 0), new(2.23f, 0.035f, 1.8f), new("e2cfaa"));
         Box(stack, new(-0.39f, 0.075f, -0.48f), new(0.98f, 0.005f, 0.11f), new("889388"));
         for (int i = 0; i < 4; i++)
+        {
             Box(stack, new(0, 0.076f, -0.19f + i * 0.18f), new(1.72f, 0.005f, 0.018f), new("b1aa90"));
+        }
     }
+
     private void Pencil(Node3D desk, Vector3 pos)
     {
         var pen = new Node3D { Position = pos + new Vector3(0, 0.07f, 0), RotationDegrees = new(0, 25, 82) };

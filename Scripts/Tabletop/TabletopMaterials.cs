@@ -2,6 +2,9 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+/// <summary>
+/// 缓存本工作台使用的材质，并在结束时释放；材质规则不进入游戏核心。
+/// </summary>
 public sealed class TabletopMaterials : IDisposable
 {
     private readonly Dictionary<(string, float, float), StandardMaterial3D> _paints = new();
@@ -17,8 +20,11 @@ public sealed class TabletopMaterials : IDisposable
         {
             material = new StandardMaterial3D
             {
-                AlbedoColor = new Color(hex), Roughness = roughness,
-                Metallic = metallic, MetallicSpecular = .5f, CullMode = BaseMaterial3D.CullModeEnum.Disabled
+                AlbedoColor = new Color(hex),
+                Roughness = roughness,
+                Metallic = metallic,
+                MetallicSpecular = .5f,
+                CullMode = BaseMaterial3D.CullModeEnum.Disabled
             };
             _paints.Add(key, material);
         }
@@ -36,7 +42,11 @@ public sealed class TabletopMaterials : IDisposable
 
     public ShaderMaterial ContactShade()
     {
-        if (_contact != null) return _contact;
+        if (_contact != null)
+        {
+            return _contact;
+        }
+
         _contact = new ShaderMaterial { Shader = GD.Load<Shader>("res://Scripts/Tabletop/Contact.gdshader") };
         _woods.Add(_contact);
         return _contact;
@@ -52,8 +62,16 @@ public sealed class TabletopMaterials : IDisposable
 
     public void Dispose()
     {
-        foreach (var material in _paints.Values) material.Dispose();
-        foreach (var material in _woods) material.Dispose();
+        foreach (var material in _paints.Values)
+        {
+            material.Dispose();
+        }
+
+        foreach (var material in _woods)
+        {
+            material.Dispose();
+        }
+
         _paints.Clear();
         _woods.Clear();
     }

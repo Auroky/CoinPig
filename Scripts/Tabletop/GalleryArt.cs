@@ -1,13 +1,22 @@
 using Godot;
 
+/// <summary>
+/// 商店木柜、技能板和图案的几何绘制助手，供界面展示复用。
+/// </summary>
 public sealed class GalleryArt : System.IDisposable
 {
     private readonly TabletopMaterials _materials;
+
     public GalleryArt(TabletopMaterials materials) => _materials = materials;
+
     private MeshInstance3D Mesh(Node3D parent, Mesh mesh, Vector3 at, Color color) => SceneShapes.Mesh(parent, mesh, at, _materials.Paint(color));
+
     private MeshInstance3D Box(Node3D parent, Vector3 at, Vector3 size, Color color) => SceneShapes.Box(parent, at, size, _materials.Paint(color));
+
     private MeshInstance3D Cylinder(Node3D parent, Vector3 at, float bottom, float top, float height, Color color, int sides = 8) => SceneShapes.Cylinder(parent, at, bottom, top, height, _materials.Paint(color), sides);
+
     private MeshInstance3D Beam(Node3D parent, Vector3 a, Vector3 b, float width, Color color) => SceneShapes.Beam(parent, a, b, width, _materials.Paint(color));
+
     public void Dispose() => _font.Dispose();
 
     private readonly SystemFont _font = new()
@@ -45,9 +54,15 @@ public sealed class GalleryArt : System.IDisposable
     {
         Color timber = new("65412a");
         for (int i = 0; i < 16; i++)
+        {
             Wood(root, new(-5.5f + i * 0.73f, 3.60f, -1.0f), new(0.72f, 6.8f, 0.14f), new(i % 2 == 0 ? "4b3022" : "523526"));
+        }
+
         for (int column = 0; column <= columns; column++)
+        {
             Wood(root, new(-5.9f + column * 11.8f / columns, 3.5f, 0), new(0.20f, 7.0f, 2.2f), timber);
+        }
+
         for (int tier = 0; tier <= tiers; tier++)
         {
             float y = tier == tiers ? 6.9f : 0.45f + tier * 6.3f / tiers;
@@ -56,8 +71,12 @@ public sealed class GalleryArt : System.IDisposable
         }
         Wood(root, new(0, 7.10f, 0.16f), new(12.5f, 0.26f, 2.5f), new("68442c"));
         foreach (float x in new[] { -5.9f, 5.9f })
+        {
             for (int i = 0; i < 3; i++)
+            {
                 Mesh(root, new SphereMesh { Radius = 0.052f, Height = 0.104f }, new(x, 0.7f + i * 2.1f, 1.12f), new("d0a46a"));
+            }
+        }
     }
 
     public void SkillIcon(Node3D parent, string icon, Color color)

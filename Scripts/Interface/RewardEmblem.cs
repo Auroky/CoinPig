@@ -1,9 +1,12 @@
 using Godot;
 
-/// <summary>卡牌上的金色符号，随布局缩放，无需额外贴图。</summary>
+/// <summary>
+/// 绘制能力卡上的二维图案，依据图案键选择画法，不解释能力的玩法效果。
+/// </summary>
 public partial class RewardEmblem : Control
 {
     public string Emblem { get; set; } = "rim";
+
     private readonly Color _gold = new("cda06b");
     private readonly Color _shade = new("715535");
 
@@ -44,7 +47,10 @@ public partial class RewardEmblem : Control
                 DrawArc(new(84, 70), 15, -Mathf.Pi / 2, Mathf.Pi / 2, 18, _gold, 7, true);
                 DrawLine(new(27, 100), new(94, 100), _gold, 4, true);
                 for (int i = 0; i < 3; i++)
+                {
                     DrawPolyline(new Vector2[] { new(40 + i * 17, 43), new(36 + i * 17, 34), new(42 + i * 17, 24) }, _gold, 3, true);
+                }
+
                 break;
             case "target":
                 Pig(new(64, 64), 0.72f);

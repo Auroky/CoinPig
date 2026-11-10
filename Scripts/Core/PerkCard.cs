@@ -1,3 +1,4 @@
-public sealed record Bill(int Shift, int Amount);
-public sealed record RentDue(int Day, int Amount, bool Paid, int DaysAway, bool Failed, bool Renewal = false);
+/// <summary>
+/// 三选一能力的静态定义；加成由核心读取，图案编号由表现层解释。
+/// </summary>
 public sealed record PerkCard(string Id, string Name, string Description, Bonus Bonus, string Emblem = "rim");

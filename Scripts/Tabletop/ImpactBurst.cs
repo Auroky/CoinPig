@@ -2,24 +2,33 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
-/// <summary>Spawns impact visuals and owns their lifetime; it never grants currency or damage.</summary>
+/// <summary>
+/// 管理三维碎片、金币、火花与冲击环。金币收集仅触发表现事件，规则收益已先结算。
+/// </summary>
 public partial class ImpactBurst : Node3D
 {
     private sealed class Pulse
     {
         public MeshInstance3D Node = null!;
-        public float Age, Delay, Radius;
+        public float Age;
+        public float Delay;
+        public float Radius;
         public Vector3 Direction;
         public bool Ray;
     }
+
     private readonly List<DebrisParticle> _particles = new();
     private readonly List<Pulse> _pulses = new();
     private readonly Random _random = new(53);
     private TabletopMaterials _materials = null!;
     private ArrayMesh _shard = null!;
-    private CylinderMesh _coin = null!, _coinFace = null!;
-    private StandardMaterial3D _soft = null!, _strong = null!;
+    private CylinderMesh _coin = null!;
+    private CylinderMesh _coinFace = null!;
+    private StandardMaterial3D _soft = null!;
+    private StandardMaterial3D _strong = null!;
+
     public event Action? CoinCollected;
+
     public int ActiveCount => _particles.Count + _pulses.Count;
 
     public void Assemble(TabletopMaterials materials)
@@ -34,16 +43,28 @@ public partial class ImpactBurst : Node3D
 
     public void Clear()
     {
-        foreach (var particle in _particles) { particle.Hide(); particle.QueueFree(); }
-        foreach (var pulse in _pulses) { pulse.Node.Hide(); pulse.Node.QueueFree(); }
-        _particles.Clear(); _pulses.Clear();
+        foreach (var particle in _particles)
+        {
+            particle.Hide();
+            particle.QueueFree();
+        }
+        foreach (var pulse in _pulses)
+        {
+            pulse.Node.Hide();
+            pulse.Node.QueueFree();
+        }
+        _particles.Clear();
+        _pulses.Clear();
     }
 
     private float Range(float minimum, float maximum) => minimum + (float)_random.NextDouble() * (maximum - minimum);
+
     private DebrisParticle Piece(Mesh mesh, Vector3 position, Material material)
     {
         var particle = new DebrisParticle { Mesh = mesh, Position = position, MaterialOverride = material };
-        AddChild(particle); _particles.Add(particle); return particle;
+        AddChild(particle);
+        _particles.Add(particle);
+        return particle;
     }
 
     public void Break(System.Numerics.Vector2 point, System.Numerics.Vector2 impact, Color glaze, Color interior, float size, int coinCount, Vector3 destination)
@@ -55,7 +76,8 @@ public partial class ImpactBurst : Node3D
             float angle = i * Mathf.Tau / 11 + Range(-.18f, .18f);
             Vector3 radial = new(Mathf.Cos(angle), 0, Mathf.Sin(angle));
             var particle = new DebrisParticle { Mesh = _shard, Position = position + radial * .22f + Vector3.Up * Range(.27f, .73f) };
-            AddChild(particle); _particles.Add(particle);
+            AddChild(particle);
+            _particles.Add(particle);
             particle.SetSurfaceOverrideMaterial(0, _materials.Paint(glaze));
             particle.SetSurfaceOverrideMaterial(1, _materials.Paint(interior));
             particle.Scale = Vector3.One * Range(.85f, 1.45f) * size;
@@ -93,8 +115,16 @@ public partial class ImpactBurst : Node3D
         var position = new Vector3(point.X, 0, point.Y);
         bool strong = result.DestroyedCount >= 2;
         Ring(position, radius, strong, 0);
-        if (strong) Ring(position, radius * .76f, true, .045f);
-        if (result.HitCount == 0) return;
+        if (strong)
+        {
+            Ring(position, radius * .76f, true, .045f);
+        }
+
+        if (result.HitCount == 0)
+        {
+            return;
+        }
+
         int rays = strong ? 10 : 6;
         for (int i = 0; i < rays; i++)
         {
@@ -114,27 +144,47 @@ public partial class ImpactBurst : Node3D
         ring.Scale = Vector3.Zero;
         _pulses.Add(new Pulse { Node = ring, Radius = radius, Delay = delay });
     }
+
     public void Resonance(System.Numerics.Vector2 point, float radius)
     {
         var at = new Vector3(point.X, 0, point.Y);
-        for (int i = 0; i < 3; i++) Ring(at, radius * (1 - i * .18f), true, i * .065f);
+        for (int i = 0; i < 3; i++)
+        {
+            Ring(at, radius * (1 - i * .18f), true, i * .065f);
+        }
     }
 
     public void Tick(float delta)
     {
         for (int i = _particles.Count - 1; i >= 0; i--)
         {
-            if (_particles[i].Tick(delta)) continue;
-            _particles[i].Hide(); _particles[i].QueueFree(); _particles.RemoveAt(i);
+            if (_particles[i].Tick(delta))
+            {
+                continue;
+            }
+
+            _particles[i].Hide();
+            _particles[i].QueueFree();
+            _particles.RemoveAt(i);
         }
         for (int i = _pulses.Count - 1; i >= 0; i--)
         {
             var pulse = _pulses[i];
             pulse.Age += delta;
             float age = pulse.Age - pulse.Delay;
-            if (age < 0) continue;
+            if (age < 0)
+            {
+                continue;
+            }
+
             float duration = pulse.Ray ? .13f : .24f;
-            if (age >= duration) { pulse.Node.Hide(); pulse.Node.QueueFree(); _pulses.RemoveAt(i); continue; }
+            if (age >= duration)
+            {
+                pulse.Node.Hide();
+                pulse.Node.QueueFree();
+                _pulses.RemoveAt(i);
+                continue;
+            }
             if (pulse.Ray)
             {
                 pulse.Node.Position += pulse.Direction * (.30f / .13f) * delta;
@@ -145,35 +195,50 @@ public partial class ImpactBurst : Node3D
                 float t = age / .14f;
                 pulse.Node.Scale = Vector3.One * pulse.Radius * (1 - (1 - t) * (1 - t));
             }
-            else pulse.Node.Scale = new(pulse.Radius, pulse.Radius * (1 - (age - .14f) / .1f), pulse.Radius);
+            else
+            {
+                pulse.Node.Scale = new(pulse.Radius, pulse.Radius * (1 - (age - .14f) / .1f), pulse.Radius);
+            }
         }
     }
 
     private static ArrayMesh MakeShard()
     {
-        Vector3[] top = { new(-.16f,.035f,-.13f), new(.19f,.02f,-.07f), new(-.04f,.06f,.21f) };
+        Vector3[] top = { new(-.16f, .035f, -.13f), new(.19f, .02f, -.07f), new(-.04f, .06f, .21f) };
         var mesh = new ArrayMesh();
         using var surface = new SurfaceTool();
         void Face(Vector3 a, Vector3 b, Vector3 c)
         {
-            var normal = (b-a).Cross(c-a).Normalized();
-            foreach(var point in new[]{a,b,c}) { surface.SetNormal(normal); surface.AddVertex(point); }
+            var normal = (b - a).Cross(c - a).Normalized();
+            foreach (var point in new[] { a, b, c })
+            {
+                surface.SetNormal(normal);
+                surface.AddVertex(point);
+            }
         }
-        surface.Begin(Mesh.PrimitiveType.Triangles); Face(top[0],top[2],top[1]); surface.Commit(mesh); surface.Clear();
         surface.Begin(Mesh.PrimitiveType.Triangles);
-        Vector3 thickness=Vector3.Up*.055f;
-        Face(top[0]-thickness,top[1]-thickness,top[2]-thickness);
-        for(int i=0;i<3;i++)
+        Face(top[0], top[2], top[1]);
+        surface.Commit(mesh);
+        surface.Clear();
+        surface.Begin(Mesh.PrimitiveType.Triangles);
+        Vector3 thickness = Vector3.Up * .055f;
+        Face(top[0] - thickness, top[1] - thickness, top[2] - thickness);
+        for (int i = 0; i < 3; i++)
         {
-            int next=(i+1)%3;
-            Face(top[i],top[next],top[next]-thickness);
-            Face(top[i],top[next]-thickness,top[i]-thickness);
+            int next = (i + 1) % 3;
+            Face(top[i], top[next], top[next] - thickness);
+            Face(top[i], top[next] - thickness, top[i] - thickness);
         }
-        surface.Commit(mesh); return mesh;
+        surface.Commit(mesh);
+        return mesh;
     }
 
     public override void _ExitTree()
     {
-        _shard?.Dispose(); _coin?.Dispose(); _coinFace?.Dispose(); _soft?.Dispose(); _strong?.Dispose();
+        _shard?.Dispose();
+        _coin?.Dispose();
+        _coinFace?.Dispose();
+        _soft?.Dispose();
+        _strong?.Dispose();
     }
 }

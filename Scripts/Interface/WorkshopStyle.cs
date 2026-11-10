@@ -1,6 +1,9 @@
 using Godot;
 using System;
 
+/// <summary>
+/// 共用字体、颜色、面板和控件构建方法，集中维护界面的视觉样式。
+/// </summary>
 public static class WorkshopStyle
 {
     public static readonly Color Text = new("f0e7d8");
@@ -60,8 +63,13 @@ public static class WorkshopStyle
         button.AddThemeStyleboxOverride("disabled", Surface(new("211c1780"), new("76614c40"), 10));
         button.AddThemeStyleboxOverride("focus", Surface(new Color(0, 0, 0, 0), Brass, 10));
         if (pill)
+        {
             foreach (string state in new[] { "normal", "hover", "pressed", "disabled", "focus" })
+            {
                 ((StyleBoxFlat)button.GetThemeStylebox(state)).SetCornerRadiusAll(27);
+            }
+        }
+
         button.Pressed += action;
         return button;
     }

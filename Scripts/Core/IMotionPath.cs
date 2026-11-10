@@ -2,18 +2,22 @@ using System;
 using System.Numerics;
 
 /// <summary>
-/// Samples a world-space position for finite, nonnegative elapsed time.
-/// Implementations are deterministic, return finite coordinates and do not change game state.
+/// 按非负有限时间采样桌面坐标。实现须确定、返回有限坐标，且不能修改游戏状态。
 /// </summary>
 public interface IMotionPath
 {
     Vector2 Sample(float elapsed);
 }
 
-/// <summary>A configurable pair of independent sinusoidal movements.</summary>
+/// <summary>
+/// 两个轴独立的正弦路线。振幅和中心使用世界单位，频率为每秒弧度，初相位为弧度。
+/// </summary>
 public sealed class HarmonicPath : IMotionPath
 {
-    private readonly Vector2 _center, _amplitude, _frequency, _phase;
+    private readonly Vector2 _center;
+    private readonly Vector2 _amplitude;
+    private readonly Vector2 _frequency;
+    private readonly Vector2 _phase;
 
     public HarmonicPath(Vector2 center, Vector2 amplitude, Vector2 frequency, Vector2 phase)
     {
@@ -21,7 +25,10 @@ public sealed class HarmonicPath : IMotionPath
             frequency.X < 0 || frequency.Y < 0 ||
             (double)MathF.Abs(center.X) + MathF.Abs(amplitude.X) > float.MaxValue ||
             (double)MathF.Abs(center.Y) + MathF.Abs(amplitude.Y) > float.MaxValue)
+        {
             throw new ArgumentException("Path parameters must produce finite coordinates with nonnegative frequencies.");
+        }
+
         _center = center;
         _amplitude = amplitude;
         _frequency = frequency;
@@ -32,7 +39,11 @@ public sealed class HarmonicPath : IMotionPath
 
     public Vector2 Sample(float elapsed)
     {
-        if (!float.IsFinite(elapsed) || elapsed < 0) throw new ArgumentOutOfRangeException(nameof(elapsed));
+        if (!float.IsFinite(elapsed) || elapsed < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(elapsed));
+        }
+
         return new(
             (float)(_center.X + _amplitude.X * Math.Sin((double)elapsed * _frequency.X + _phase.X)),
             (float)(_center.Y + _amplitude.Y * Math.Sin((double)elapsed * _frequency.Y + _phase.Y)));

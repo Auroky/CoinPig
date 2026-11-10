@@ -1,28 +1,40 @@
 using System;
 using System.Collections.Generic;
 
-public enum ShiftPhase { Ready, Working, Choosing, Shopping, Won, Bankrupt }
+/// <summary>
+/// 会话允许的阶段。命令通过阶段判断是否合法，界面根据阶段选择对应页面。
+/// </summary>
+public enum ShiftPhase
+{
+    Ready, Working, Choosing, Shopping, Won, Bankrupt
+}
+
+/// <summary>
+/// 一次收工的不可变结算记录；区分应付、实付和缺口，便于失败时保留正确余额。
+/// </summary>
 public sealed record ShiftReceipt(int Shift, int OpeningCash, int Earnings, int Due, int Paid, int Shortfall, int Pigs);
 
-/// <summary>协调一局的回合、体力和钱包；合法命令交给伤害、账单和成长对象处理。</summary>
+/// <summary>
+/// 拥有回合、体力和钱包，协调伤害、租金与成长事务。所有经济变更通过合法命令统一提交。
+/// </summary>
 public sealed class GameSession : IShop, ISkillTree, ISessionView, IWeaponLoadout, IEquipmentStatusView
 {
-    private readonly PerkProgress _perks;
-    private readonly SwingRewards _rewards;
-    private readonly RentContract _contract;
+    private readonly PerkProgress _perkProgress;
+    private readonly SwingRewards _swingRewards;
+    private readonly RentContract _rentContract;
     private readonly SessionDefinition _definition;
-    private readonly SkillProgress _skills;
-    private readonly ShopInventory _inventory;
+    private readonly SkillProgress _skillProgress;
+    private readonly ShopInventory _shopInventory;
 
     public GameSession(SessionDefinition definition, Random? random = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
         _definition = definition;
-        _perks = new PerkProgress(definition.Perks, random ?? new Random());
-        _skills = new SkillProgress(definition.Skills);
-        _inventory = new ShopInventory(definition.Products);
-        _contract = new RentContract(definition.Bills, definition.RentContinuation);
-        _rewards = new SwingRewards(definition.RewardRules);
+        _perkProgress = new PerkProgress(definition.Perks, random ?? new Random());
+        _skillProgress = new SkillProgress(definition.Skills);
+        _shopInventory = new ShopInventory(definition.Products);
+        _rentContract = new RentContract(definition.Bills, definition.RentContinuation);
+        _swingRewards = new SwingRewards(definition.RewardRules);
         Stamina = definition.Tuning.StartingStamina;
     }
 
@@ -32,15 +44,19 @@ public sealed class GameSession : IShop, ISkillTree, ISessionView, IWeaponLoadou
     public int Wallet { get; private set; }
     public int ShiftEarnings { get; private set; }
     public int Stamina { get; private set; }
-    public Bonus TotalBonus => _inventory.TotalBonus.Add(_inventory.EquippedBonus).Add(_skills.TotalBonus).Add(_perks.TotalBonus);
+    public Bonus TotalBonus => _shopInventory.TotalBonus.Add(_shopInventory.EquippedBonus).Add(_skillProgress.TotalBonus).Add(_perkProgress.TotalBonus);
     public WeaponLoadout EquippedWeapon
     {
         get
         {
-            var product = _inventory.EquippedProduct;
-            int level = product == null ? 0 : _inventory.Level(product.Id);
-            return new(product?.Weapon ?? _definition.StartingWeapon, level,
-                product?.TierAt(level - 1).Palette ?? ShopProduct.StandardPalette, product?.Id);
+            var product = _shopInventory.EquippedProduct;
+            int level = product == null ? 0 : _shopInventory.Level(product.Id);
+            return new(
+                product?.Weapon ?? _definition.StartingWeapon,
+                level,
+                product?.TierAt(level - 1).Palette ?? ShopProduct.StandardPalette,
+                product?.Id
+            );
         }
     }
     public AttackStats AttackStats
@@ -49,42 +65,61 @@ public sealed class GameSession : IShop, ISkillTree, ISessionView, IWeaponLoadou
         {
             var stats = EquippedWeapon.Weapon.Attack.Stats(_definition.Tuning, TotalBonus);
             if (stats.Damage <= 0 || stats.StaminaCost <= 0 || !float.IsFinite(stats.Radius) || stats.Radius <= 0)
+            {
                 throw new InvalidOperationException("Weapon strategies must return positive finite attack values.");
+            }
+
             return stats;
         }
     }
     public int StaminaCost => AttackStats.StaminaCost;
     public bool CanAttack => Stamina >= StaminaCost;
-    public IReadOnlyList<CombatEffectDefinition> ActiveEffects => _inventory.ActiveEffects;
-    public EquipmentTier? EquippedAccessory => _inventory.AccessoryTier;
+    public IReadOnlyList<CombatEffectDefinition> ActiveEffects => _shopInventory.ActiveEffects;
+    public EquipmentTier? EquippedAccessory => _shopInventory.AccessoryTier;
+
     public SwingTiming AttackTiming(SwingTiming baseline) => EquippedWeapon.Weapon.Attack.Timing(baseline);
+
     public IReadOnlyList<PigState> Targets(PigHerd herd, System.Numerics.Vector2 point) => EquippedWeapon.Weapon.Attack.Targets(herd, point, AttackStats);
+
     public int ContractLength => _definition.ContractLength;
     public float Radius => AttackStats.Radius;
     public int Damage => AttackStats.Damage;
     public int ShiftPigs { get; private set; }
     public float RecoveryReduction => TotalBonus.Recovery;
-    public int PaidBills => _contract.PaidCount;
+    public int PaidBills => _rentContract.PaidCount;
     public int Capacity => checked(_definition.Tuning.StartingStamina + TotalBonus.Stamina);
     public float ExtraRadius => TotalBonus.Radius;
-    public Bill? NextBill => _contract.Next;
+    public Bill? NextBill => _rentContract.Next;
     public ShiftReceipt? Receipt { get; private set; }
-    public IReadOnlyList<PerkCard> Offers => _perks.Offers;
+    public IReadOnlyList<PerkCard> Offers => _perkProgress.Offers;
 
-    public bool Has(string perk) => _perks.Has(perk);
+    public bool Has(string perk) => _perkProgress.Has(perk);
 
-    public IReadOnlyList<RentDue> GetRentSchedule() => _contract.Schedule(Shift, Phase == ShiftPhase.Bankrupt);
+    public IReadOnlyList<RentDue> GetRentSchedule() => _rentContract.Schedule(Shift, Phase == ShiftPhase.Bankrupt);
 
+    /// <summary>开始下一局并重置本局计数；从通关阶段继续时进入无尽模式，金币和成长保留。</summary>
     public bool BeginShift()
     {
-        if (Phase != ShiftPhase.Ready && Phase != ShiftPhase.Shopping && Phase != ShiftPhase.Won) return false;
-        if (Phase == ShiftPhase.Won) IsEndless = true;
-        if (Phase != ShiftPhase.Ready) Shift++;
+        if (Phase != ShiftPhase.Ready && Phase != ShiftPhase.Shopping && Phase != ShiftPhase.Won)
+        {
+            return false;
+        }
+
+        if (Phase == ShiftPhase.Won)
+        {
+            IsEndless = true;
+        }
+
+        if (Phase != ShiftPhase.Ready)
+        {
+            Shift++;
+        }
+
         Phase = ShiftPhase.Working;
         ShiftEarnings = 0;
         ShiftPigs = 0;
         Stamina = Capacity;
-        _rewards.BeginDay();
+        _swingRewards.BeginDay();
         return true;
     }
 
@@ -93,76 +128,124 @@ public sealed class GameSession : IShop, ISkillTree, ISessionView, IWeaponLoadou
     {
         strike = null;
         coins = 0;
-        if (Phase != ShiftPhase.Working || !CanAttack) return false;
+        if (Phase != ShiftPhase.Working || !CanAttack)
+        {
+            return false;
+        }
+
         return ResolveStrike(targets, Damage, StaminaCost, out strike, out coins);
     }
+
     internal bool ApplyEffect(EffectPulse pulse, out SwingResult? strike, out int coins)
     {
-        strike = null; coins = 0;
-        if (Phase != ShiftPhase.Working) return false;
+        strike = null;
+        coins = 0;
+        if (Phase != ShiftPhase.Working)
+        {
+            return false;
+        }
+
         return ResolveStrike(pulse.Targets, pulse.Damage, 0, out strike, out coins);
     }
+
     private bool ResolveStrike(IEnumerable<PigState> targets, int damage, int staminaSpent, out SwingResult? strike, out int coins)
     {
-        var prepared = StrikeResolver.Prepare(targets, damage);
-        var quote = _rewards.Prepare(prepared, TotalBonus, staminaSpent);
-        int nextWallet = checked(Wallet + quote.Payout.Coins);
-        int nextEarnings = checked(ShiftEarnings + quote.Payout.Coins);
-        int nextStamina = checked(Stamina - staminaSpent + quote.Payout.StaminaRefund);
-        int nextPigs = checked(ShiftPigs + prepared.DestroyedCount);
-        // Validate every extension before committing health, budgets, counters or money.
-        StrikeResolver.Apply(prepared, damage);
-        _rewards.Commit(quote);
-        prepared.MarkSettled();
-        Wallet = nextWallet; ShiftEarnings = nextEarnings; Stamina = nextStamina; ShiftPigs = nextPigs;
-        strike = prepared;
-        coins = quote.Payout.Coins;
+        // 先在临时结果里计算伤害、奖励及溢出风险；任何验证失败都不改变猪、钱包或奖励次数。
+        var preparedStrike = StrikeResolver.Prepare(targets, damage);
+        var rewardQuote = _swingRewards.Prepare(preparedStrike, TotalBonus, staminaSpent);
+        int nextWallet = checked(Wallet + rewardQuote.Payout.Coins);
+        int nextEarnings = checked(ShiftEarnings + rewardQuote.Payout.Coins);
+        int nextStamina = checked(Stamina - staminaSpent + rewardQuote.Payout.StaminaRefund);
+        int nextPigs = checked(ShiftPigs + preparedStrike.DestroyedCount);
+        // 所有计算成功后再统一提交。本方法是本次攻击写入耐久和经济状态的唯一入口。
+        StrikeResolver.Apply(preparedStrike, damage);
+        _swingRewards.Commit(rewardQuote);
+        preparedStrike.MarkSettled();
+        Wallet = nextWallet;
+        ShiftEarnings = nextEarnings;
+        Stamina = nextStamina;
+        ShiftPigs = nextPigs;
+        strike = preparedStrike;
+        coins = rewardQuote.Payout.Coins;
         return true;
     }
 
+    /// <summary>收工并处理到期租金。失败终止本局；中途交租成功提供三选一；最后一笔结清则通关。</summary>
     public void CloseShift()
     {
-        if (Phase != ShiftPhase.Working) return;
-        int previouslyPaid = _contract.PaidCount;
-        var payment = _contract.Settle(Shift, Wallet);
-        int due = payment.Due, missing = payment.Shortfall, paid = payment.Paid;
+        if (Phase != ShiftPhase.Working)
+        {
+            return;
+        }
+
+        int previousPaidBillCount = _rentContract.PaidCount;
+        // 先交租，再决定失败、胜利或三选一；最终房租结清后直接进入通关状态。
+        var payment = _rentContract.Settle(Shift, Wallet);
+        int due = payment.Due;
+        int missing = payment.Shortfall;
+        int paid = payment.Paid;
         Receipt = new(Shift, Wallet - ShiftEarnings, ShiftEarnings, due, paid, missing,
             ShiftPigs);
         Wallet -= paid;
 
-        if (missing > 0) { Phase = ShiftPhase.Bankrupt; return; }
-        if (_contract.PaidCount == previouslyPaid) { Phase = ShiftPhase.Shopping; return; }
+        if (missing > 0)
+        {
+            Phase = ShiftPhase.Bankrupt;
+            return;
+        }
+        if (_rentContract.PaidCount == previousPaidBillCount)
+        {
+            Phase = ShiftPhase.Shopping;
+            return;
+        }
 
-        if (_contract.ContractPaid && !IsEndless) { Phase = ShiftPhase.Won; return; }
-        _perks.OfferChoices();
+        if (_rentContract.ContractPaid && !IsEndless)
+        {
+            Phase = ShiftPhase.Won;
+            return;
+        }
+        _perkProgress.OfferChoices();
         Phase = Offers.Count > 0 ? ShiftPhase.Choosing : ShiftPhase.Shopping;
     }
 
     public bool Choose(string kind)
     {
-        if (Phase != ShiftPhase.Choosing || !_perks.Choose(kind)) return false;
+        if (Phase != ShiftPhase.Choosing || !_perkProgress.Choose(kind))
+        {
+            return false;
+        }
+
         Phase = ShiftPhase.Shopping;
         return true;
     }
 
-    public IReadOnlyList<SkillOffer> GetSkills() => _skills.Quote(Phase == ShiftPhase.Shopping, Wallet);
+    public IReadOnlyList<SkillOffer> GetSkills() => _skillProgress.Quote(Phase == ShiftPhase.Shopping, Wallet);
+
     public SkillResult TryLearn(string id)
     {
         // 技能状态验证前置和金币，成功后由回合钱包同步扣款。
-        var result = _skills.TryLearn(id, Phase == ShiftPhase.Shopping, Wallet);
-        if (result.Succeeded) Wallet -= result.CashSpent;
+        var result = _skillProgress.TryLearn(id, Phase == ShiftPhase.Shopping, Wallet);
+        if (result.Succeeded)
+        {
+            Wallet -= result.CashSpent;
+        }
+
         return result;
     }
 
-    public IReadOnlyList<ShopOffer> GetOffers() => _inventory.Quote(Wallet, Phase == ShiftPhase.Shopping);
+    public IReadOnlyList<ShopOffer> GetOffers() => _shopInventory.Quote(Wallet, Phase == ShiftPhase.Shopping);
 
     public PurchaseResult TryBuy(string productId, int expectedLevel)
     {
-        var result = _inventory.TryPurchase(productId, expectedLevel, Wallet, Phase == ShiftPhase.Shopping);
-        if (result.Succeeded) Wallet -= result.CashSpent;
+        var result = _shopInventory.TryPurchase(productId, expectedLevel, Wallet, Phase == ShiftPhase.Shopping);
+        if (result.Succeeded)
+        {
+            Wallet -= result.CashSpent;
+        }
+
         return result;
     }
-    public EquipResult TryEquip(string productId) => Phase == ShiftPhase.Shopping
-        ? _inventory.TryEquip(productId) : new(EquipStatus.Closed);
-}
 
+    public EquipResult TryEquip(string productId) => Phase == ShiftPhase.Shopping
+        ? _shopInventory.TryEquip(productId) : new(EquipStatus.Closed);
+}
