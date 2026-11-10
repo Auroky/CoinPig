@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 
-public sealed record PigSpawn(PigDefinition Definition, IMotionPath Path);
+public sealed record PigSpawn(PigDefinition Definition, IMotionPath Path, float BodyRadius = 0, float BodyHalfLength = 0);
 
 /// <summary>Starting population and reusable route configurations.</summary>
 public static class HerdLayout

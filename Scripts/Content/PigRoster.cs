@@ -19,6 +19,10 @@ public sealed class PigArchetype
     public PigAppearance Appearance { get; }
     public IReadOnlyList<IMotionPath> Routes { get; }
     public int FirstShift { get; }
+    // Conservative ground footprints include the mesh's nose, key and pose animation,
+    // or the painted silhouette. This translation belongs to content, not the domain.
+    public float BodyRadius => MathF.Max(.68f * Appearance.Scale, .67f * Appearance.Scale2D);
+    public float BodyHalfLength => .5f * Appearance.Scale;
     public PigArchetype(PigDefinition definition, PigAppearance appearance, params IMotionPath[] routes)
         : this(definition, appearance, 1, routes) { }
     public PigArchetype(PigDefinition definition, PigAppearance appearance, int firstShift, params IMotionPath[] routes)
@@ -59,7 +63,7 @@ public sealed class PigRoster : IPigAppearanceSource
     {
         if (shift <= 0) throw new ArgumentOutOfRangeException(nameof(shift));
         return Array.AsReadOnly(All.Where(pig => pig.FirstShift <= shift)
-            .SelectMany(pig => pig.Routes.Select(route => new PigSpawn(pig.Definition, route))).ToArray());
+            .SelectMany(pig => pig.Routes.Select(route => new PigSpawn(pig.Definition, route, pig.BodyRadius, pig.BodyHalfLength))).ToArray());
     }
     public PigDefinition Get(string id) => _byId.TryGetValue(id, out var pig) ? pig.Definition :
         throw new KeyNotFoundException($"Unknown pig species: {id}");

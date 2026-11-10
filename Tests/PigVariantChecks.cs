@@ -11,7 +11,7 @@ internal static class PigVariantChecks
 
     public static void Run(Action<bool, string> check)
     {
-        foreach (var (id, hits) in new[] { ("ceramic", 1), ("tin", 3), ("swift", 2), ("armored", 5) })
+        foreach (var (id, hits) in new[] { ("ceramic", 1), ("tin", 4), ("swift", 3), ("armored", 10) })
         {
             var herd = new PigHerd(new[] { new PigSpawn(PigContent.Get(id), new StraightPath()) });
             var pig = herd.Pigs.Single();
@@ -41,6 +41,30 @@ internal static class PigVariantChecks
             check(pig.Active && pig.State.Health == hits, $"{id} respawns with full durability");
         }
 
+        var skillBonus = SkillContent.Nodes.Aggregate(new Bonus(), (total, skill) => total.Add(skill.Bonus));
+        var cuff = EquipmentContent.Products.Single(product => product.Id == "Stamina").TierAt(2);
+        foreach (var product in EquipmentContent.Products.Where(product => product.Weapon != null))
+        {
+            for (int level = 1; level <= product.MaxLevel; level++)
+            {
+                var stats = product.Weapon!.Attack.Stats(BalanceContent.Tuning, product.BonusThrough(level).Add(skillBonus));
+                var pig = new PigState(PigContent.Get("armored"));
+                int hits = 0;
+                while (pig.IsAlive && hits < 20) { StrikeResolver.Resolve(new[] { pig }, stats.Damage); hits++; }
+                check(hits >= 2 && hits <= 4, $"{product.Id} tier {level} with all damage skills needs two to four attacks on fresh armor");
+
+                var herd = new PigHerd(new[] { new PigSpawn(PigContent.Get("armored"), new StraightPath()) });
+                var target = herd.Pigs.Single();
+                var strike = StrikeResolver.Resolve(new[] { target.State }, stats.Damage);
+                herd.Apply(strike);
+                var context = new EffectContext(0, herd, Vector2.Zero, new StrikeOutcome(Vector2.Zero, strike, 0));
+                foreach (var effect in cuff.Effects!)
+                    foreach (var pulse in effect.Create().Advance(context))
+                        herd.Apply(StrikeResolver.Resolve(pulse.Targets, pulse.Damage));
+                check(target.Active, $"{product.Id} tier {level} plus the strongest opening impact resonance cannot instantly destroy fresh armor");
+            }
+        }
+
         var motions = PigContent.Roster.All.Select(p => p.Definition).Select(definition => new PigMotion(new(definition, new StraightPath()))).ToArray();
         foreach (var motion in motions) motion.Advance(1);
         var ordinary = motions.Single(p => p.State.Definition.Id == "ceramic");
@@ -53,7 +77,7 @@ internal static class PigVariantChecks
 
         var armored = new PigState(PigContent.Get("tin"));
         var runner = new PigState(PigContent.Get("swift"));
-        var upgraded = StrikeResolver.Resolve(new[] { armored, runner }, 2);
+        var upgraded = StrikeResolver.Resolve(new[] { armored, runner }, 3);
         check(armored.Health == 1 && armored.IsAlive && !runner.IsAlive && upgraded.DestroyedCount == 1,
             "new pig variants respect the existing hammer damage upgrades");
     }

@@ -61,6 +61,14 @@ internal static class ScenarioRunner
             await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame);
             await Capture(g, "01-intro");
             Press(g, "Start"); Check(g.Session.Phase == ShiftPhase.Working && !g.Interface.Menu.IsOpen, "start button begins playable day");
+            if (g.Bench is TabletopView openingTable)
+            {
+                var models = openingTable.GetChildren().OfType<PigModel>().Where(model => !model.IsQueuedForDeletion()).ToArray();
+                Check(models.Length == g.Herd.Pigs.Count && models.All(model =>
+                    model.Position.DistanceTo(new Vector3(model.Motion.Position.X, 0, model.Motion.Position.Y)) < .0001f &&
+                    model.Basis.Z.DistanceTo(new Vector3(model.Motion.Forward.X, 0, model.Motion.Forward.Y)) < .0001f),
+                    "new 3D models start at their separated positions and shared headings before the first update");
+            }
             int openingStamina = g.Session.Stamina;
             MovePointer(g, g.Bench.ScreenPosition(g.Herd.Pigs[0])); Tick(g, .5f);
             Check(g.Session.Stamina == openingStamina, "entering the table immediately after Start cannot spend stamina during opening preparation");
@@ -218,7 +226,7 @@ internal static class ScenarioRunner
                 foreach (var point in candidates)
                 {
                     // Allow room for the pigs to keep moving during the windup.
-                    var hits = visible.Where(p => System.Numerics.Vector2.Distance(p.Position, point) <= g.Bench.Radius - .4f).Select(p => p.State);
+                    var hits = visible.Where(p => System.Numerics.Vector2.Distance(p.Position, point) <= g.Bench.Radius + p.State.Definition.HitRadius - .1f).Select(p => p.State);
                     float score = hits.Sum(p => p.Definition.Coins / (float)Math.Ceiling(p.Health / (float)g.Session.Damage));
                     if (score > bestScore) { bestScore = score; bestPoint = point; }
                 }

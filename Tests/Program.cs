@@ -20,26 +20,27 @@ static class Program
     static void Main()
     {
         var run = DefaultGame.CreateSession(new Random(42)); var tin = Pig("tin");
-        Check(!run.TrySwing(new[] { tin }, out _, out _) && tin.Health == 3, "invalid phase cannot damage pigs");
+        int tinHealth = tin.Definition.MaxHealth, tinCoins = tin.Definition.Coins;
+        Check(!run.TrySwing(new[] { tin }, out _, out _) && tin.Health == tinHealth, "invalid phase cannot damage pigs");
         Check(run.TryBuy("Rim", 0).Status == PurchaseStatus.Closed && run.Wallet == 0, "closed shop preserves wallet");
         Check(run.BeginShift() && !run.BeginShift(), "begin is not repeatable during work");
-        Check(run.TrySwing(new[] { tin, tin }, out var first, out int coins) && tin.Health == 2 && coins == 0 && run.Stamina == run.Capacity - 1, "one damage and one stamina for duplicate targets");
+        Check(run.TrySwing(new[] { tin, tin }, out var first, out int coins) && tin.Health == tinHealth - 1 && coins == 0 && run.Stamina == run.Capacity - 1, "one damage and one stamina for duplicate targets");
         int stamina = run.Stamina;
         Check(first!.IsSettled && typeof(GameSession).GetMethod("LandSwing") == null, "settlement is completed internally and has no public replay entry");
-        run.TrySwing(new[] { tin }, out _, out _); run.TrySwing(new[] { tin }, out _, out coins);
-        Check(!tin.IsAlive && coins == 6 && run.Wallet == 6, "tin pays only at destruction");
+        for (int strikeIndex = 1; strikeIndex < tinHealth; strikeIndex++) run.TrySwing(new[] { tin }, out _, out coins);
+        Check(!tin.IsAlive && coins == tinCoins && run.Wallet == tinCoins, "tin pays only at destruction");
         run.TrySwing(new[] { tin }, out _, out coins);
-        Check(coins == 0 && run.Wallet == 6, "dead pig cannot pay twice");
-        tin.Respawn(); Check(tin.Health == 3, "respawn restores maximum health");
+        Check(coins == 0 && run.Wallet == tinCoins, "dead pig cannot pay twice");
+        tin.Respawn(); Check(tin.Health == tinHealth, "respawn restores maximum health");
         stamina = run.Stamina; run.TrySwing(Array.Empty<PigState>(), out _, out coins);
         Check(coins == 0 && run.Stamina == stamina - 1, "miss costs one stamina");
         run.CloseShift();
-        Check(run.TryBuy("Rim", 0).Status == PurchaseStatus.InsufficientFunds && run.Wallet == 6 && run.ExtraRadius == 0, "unaffordable purchase changes nothing");
+        Check(run.TryBuy("Rim", 0).Status == PurchaseStatus.InsufficientFunds && run.Wallet == tinCoins && run.ExtraRadius == 0, "unaffordable purchase changes nothing");
         Check(run.TryBuy("missing", 0).Status == PurchaseStatus.UnknownProduct, "unknown item rejected");
-        Check(!run.TryLearn("power2").Succeeded && run.Wallet == 6 && run.Damage == 1, "locked skill changes nothing");
-        Check(!run.TryLearn("missing").Succeeded && run.Wallet == 6, "unknown skill rejected");
+        Check(!run.TryLearn("power2").Succeeded && run.Wallet == tinCoins && run.Damage == 1, "locked skill changes nothing");
+        Check(!run.TryLearn("missing").Succeeded && run.Wallet == tinCoins, "unknown skill rejected");
         run.BeginShift(); run.CloseShift();
-        Check(run.Phase == ShiftPhase.Bankrupt && run.Receipt!.Shortfall == 22 && run.Wallet == 6, "rent failure keeps unpaid cash and records shortfall");
+        Check(run.Phase == ShiftPhase.Bankrupt && run.Receipt!.Shortfall == BalanceContent.Bills[0].Amount - tinCoins && run.Wallet == tinCoins, "rent failure keeps unpaid cash and records shortfall");
         Check(!run.BeginShift() && !run.TrySwing(new[] { tin }, out _, out _), "bankruptcy is terminal");
 
         run = DefaultGame.CreateSession(new Random(7)); run.BeginShift(); Earn(run); run.CloseShift();
@@ -98,6 +99,7 @@ static class Program
         EquipmentChecks.Run(Check);
         LeaseChecks.Run(Check);
         CampaignChecks.Run(Check);
+        HerdSpacingChecks.Run(Check);
         Console.WriteLine($"PASS: {_checks} core checks. No Godot runtime required.");
     }
 }

@@ -11,9 +11,8 @@ public partial class PigModel : Node3D
     private readonly Node3D[] _legs = new Node3D[4];
     private Label3D _healthLabel = null!;
     private Font _font = null!;
-    private System.Numerics.Vector2 _previous;
     private int _index;
-    private float _yaw, _hurtTime, _healthSeconds, _spawnAge = .16f;
+    private float _hurtTime, _healthSeconds, _spawnAge = .16f;
     private bool _wasActive;
     public PigMotion Motion => _motion;
     public PigState State => _motion.State;
@@ -30,9 +29,7 @@ public partial class PigModel : Node3D
         _index = index;
         _motion = motion;
         _materials = materials;
-        _previous = motion.Position;
         _wasActive = motion.Active;
-        _yaw = motion.Position.X > 0 ? -Mathf.Pi / 2 : Mathf.Pi / 2;
         _finish = appearance;
         _font = WorkshopStyle.BodyFont();
         Glaze = new Color(_finish.Body3D);
@@ -81,7 +78,7 @@ public partial class PigModel : Node3D
         }
         BuildDurabilityDisplay();
         AddSpeciesDetails();
-        _body.Scale = Vector3.One * _finish.Scale;
+        Present();
     }
 
     private void BuildDurabilityDisplay()
@@ -152,11 +149,8 @@ public partial class PigModel : Node3D
 
     public void Present()
     {
-        var movement = _motion.Position - _previous;
-        if (movement.LengthSquared() > .0000001f) _yaw = Mathf.Atan2(movement.X, movement.Y);
-        _previous = _motion.Position;
         Position = new(_motion.Position.X, 0, _motion.Position.Y);
-        Rotation = new(0, _yaw, 0);
+        Rotation = new(0, Mathf.Atan2(_motion.Forward.X, _motion.Forward.Y), 0);
         if (_motion.Active && !_wasActive) _spawnAge = 0;
         _wasActive = _motion.Active;
         float t = Mathf.Clamp(_spawnAge / .16f, 0, 1) - 1;

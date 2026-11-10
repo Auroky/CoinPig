@@ -33,7 +33,13 @@ public static class PigPainter
         {
             canvas.DrawArc(new(-2, -1), 19, 1.7f, 4.6f, 20, new("b5c0ac"), 2, true);
         }
-        if (pig.State.Definition.MaxHealth > 1)
+        if (pig.State.Definition.MaxHealth > 5)
+        {
+            canvas.DrawRect(new Rect2(-21, 30, 42, 6), new Color(0, 0, 0, .45f));
+            float remaining = pig.State.Health / (float)pig.State.Definition.MaxHealth;
+            canvas.DrawRect(new Rect2(-20, 31, 40 * remaining, 4), new Color("d9bd7d"));
+        }
+        else if (pig.State.Definition.MaxHealth > 1)
         {
             for (int i = 0; i < pig.State.Definition.MaxHealth; i++)
                 canvas.DrawCircle(new(-(pig.State.Definition.MaxHealth - 1) * 4.5f + i * 9, 33), 3, i < pig.State.Health ? new("d9bd7d") : new Color(0, 0, 0, .3f));

@@ -11,7 +11,7 @@ internal static class CampaignChecks
             check(run.BeginShift() && run.Session.Shift == day, "campaign starts the expected day");
             var armored = run.Herd.Pigs.Where(p => p.State.Definition.Id == "armored").ToArray();
             check(armored.Length == (day >= 6 ? 1 : 0), "armored pig unlocks after five completed days");
-            if (armored.Length > 0) check(armored[0].State.Health == 5, "new shift restores armored durability");
+            if (armored.Length > 0) check(armored[0].State.Health == 10, "new shift restores armored durability");
             if (day == 1) run.Session.TrySwing(new[] { new PigState(new("fund", "Fund", 1, 1, 452, "fund")) }, out _, out _);
             run.EndShift();
             check(run.Session.Receipt!.Paid == (BalanceContent.Bills.SingleOrDefault(bill => bill.Shift == day)?.Amount ?? 0),
@@ -51,10 +51,5 @@ internal static class CampaignChecks
         bool invalid = false;
         try { roster.SpawnsForShift(0); } catch (ArgumentOutOfRangeException) { invalid = true; }
         check(invalid, "invalid spawn day is rejected");
-        var pig = new PigState(PigContent.Get("armored"));
-        StrikeResolver.Resolve(new[] { pig }, 3);
-        check(pig.Health == 2 && pig.IsAlive, "upgraded damage still reduces armored durability normally");
-        StrikeResolver.Resolve(new[] { pig }, 3);
-        check(!pig.IsAlive, "damage upgrades can defeat armored pigs in fewer strikes");
     }
 }

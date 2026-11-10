@@ -7,6 +7,11 @@ public sealed class PigMotion
     public PigState State { get; }
     public Vector2 Position { get; private set; }
     public float Time { get; private set; }
+    public float BodyRadius { get; }
+    public float BodyHalfLength { get; }
+    public Vector2 Forward { get; private set; } = Vector2.UnitX;
+    internal Vector2 PreferredStep { get; private set; }
+    private Vector2 _pathPosition;
     public bool Active => State.IsAlive && _respawnIn <= 0;
     private readonly IMotionPath _path;
     private float _respawnIn;
@@ -15,9 +20,12 @@ public sealed class PigMotion
     {
         ArgumentNullException.ThrowIfNull(spawn);
         ArgumentNullException.ThrowIfNull(spawn.Path);
+        if (!float.IsFinite(spawn.BodyRadius) || spawn.BodyRadius < 0 || !float.IsFinite(spawn.BodyHalfLength) || spawn.BodyHalfLength < 0)
+            throw new ArgumentOutOfRangeException(nameof(spawn), "Body dimensions must be finite and nonnegative.");
+        BodyRadius = spawn.BodyRadius; BodyHalfLength = spawn.BodyHalfLength;
         _path = spawn.Path;
         State = new PigState(spawn.Definition);
-        Position = _path.Sample(0);
+        Position = _pathPosition = _path.Sample(0);
         if (!float.IsFinite(Position.X) || !float.IsFinite(Position.Y))
             throw new ArgumentException("Motion paths must return a finite starting position.", nameof(spawn));
     }
@@ -30,14 +38,32 @@ public sealed class PigMotion
         var nextPosition = _path.Sample(nextTime);
         if (!float.IsFinite(nextPosition.X) || !float.IsFinite(nextPosition.Y))
             throw new InvalidOperationException("Motion paths must return finite positions.");
+        // Keep collision displacement between frames; returning to the route gradually
+        // avoids snapping straight through another pig when two paths cross.
+        var proposed = BodyRadius > 0 && Active
+            ? Vector2.Lerp(Position + nextPosition - _pathPosition, nextPosition, 1 - MathF.Exp(-2 * delta))
+            : nextPosition;
+        if (!float.IsFinite(proposed.X) || !float.IsFinite(proposed.Y))
+            throw new InvalidOperationException("Movement must remain finite.");
+        PreferredStep = proposed - Position;
+        if (PreferredStep.LengthSquared() > .000001f && delta > 0)
+        {
+            float heading = MathF.Atan2(Forward.Y, Forward.X);
+            float turn = MathF.IEEERemainder(MathF.Atan2(PreferredStep.Y, PreferredStep.X) - heading, MathF.Tau);
+            heading += Math.Clamp(turn, -6 * delta, 6 * delta);
+            Forward = new Vector2(MathF.Cos(heading), MathF.Sin(heading));
+        }
+        _pathPosition = nextPosition;
         Time = nextTime;
         if (_respawnIn > 0)
         {
             _respawnIn -= delta;
             if (_respawnIn <= 0) State.Respawn();
         }
-        Position = nextPosition;
+        Position = proposed;
     }
+
+    internal void ConstrainPosition(Vector2 position) => Position = position;
 
     internal void Receive(DamageResult hit)
     {

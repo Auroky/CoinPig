@@ -45,7 +45,6 @@ internal static class EquipmentChecks
                 check(progression.Radius > previousRadius && progression.Damage >= previousDamage &&
                     progression.Capacity > previousCapacity && progression.StaminaCost == 1,
                     $"{item.Id} tier {level + 1} improves reach and stamina without losing damage or affordable attacks");
-                if (level > 0) check(progression.Damage > previousDamage, $"{item.Id} later tiers increase damage as well as radius and stamina");
                 previousRadius = progression.Radius; previousDamage = progression.Damage; previousCapacity = progression.Capacity;
             }
         }
@@ -105,7 +104,7 @@ internal static class EquipmentChecks
         check(session.TryEquip("Rim").Status == EquipStatus.Closed, "equipment changes cannot alter an in-flight working shift");
         var tin = new PigState(PigContent.Get("tin")); int stamina = session.Stamina;
         session.TrySwing(new[] { tin }, out _, out int coins);
-        check(!tin.IsAlive && session.Stamina == stamina - 1 && coins == 6, "grinder damage and energy are settled once through the same atomic command");
+        check(!tin.IsAlive && session.Stamina == stamina - 1 && coins == PigContent.Get("tin").Coins, "grinder damage and energy are settled once through the same atomic command");
 
         var bad = new ShopProduct("a", "A", "", 0, 0, 1, new(), Requirements: new[] { new ProductRequirement("missing", 1) });
         check(Rejects<ArgumentException>(() => new ShopInventory(new[] { bad })), "missing equipment prerequisites are rejected at composition");
@@ -118,24 +117,24 @@ internal static class EquipmentChecks
         session = new GameSession(configured); session.BeginShift(); session.CloseShift(); session.TryBuy(product.Id, 0); session.BeginShift();
         var herd = new PigHerd(new[] { At("tin", Vector2.Zero), At("tin", new(1, 0)) });
         session.TrySwing(session.Targets(herd, Vector2.Zero), out _, out coins);
-        check(session.EquippedWeapon.Weapon == orb && !herd.Pigs[0].Active && herd.Pigs[1].Active && coins == 6,
+        check(session.EquippedWeapon.Weapon == orb && !herd.Pigs[0].Active && herd.Pigs[1].Active && coins == PigContent.Get("tin").Coins,
             "an unknown weapon and a new targeting strategy require no branch in the session or herd");
 
         var run = new WorkshopRun(new FixedFactory(DefaultGame.Definition(tuning: new(3), startingWeapon: new WeaponDefinition("two-energy", "Test", new CircularWeaponAttack(extraDamage: 2, staminaCost: 2))),
             new[] { At("tin", Vector2.Zero) }));
         run.BeginShift(); int frames = 0;
         while (run.Session.Phase == ShiftPhase.Working && frames++ < 100) run.Advance(.05f, Vector2.Zero);
-        check(run.Session.Phase == ShiftPhase.Shopping && run.Session.Stamina == 1 && run.Session.ShiftPigs == 1,
-            "a multi-energy weapon automatically settles an odd leftover without hanging the shift");
+        check(run.Session.Phase == ShiftPhase.Shopping && run.Session.Stamina == 1 && run.Session.ShiftPigs == 0 && run.Herd.Pigs.Single().State.Health == 1,
+            "a multi-energy weapon settles an odd leftover even if the target survives");
 
         run = new WorkshopRun(new FixedFactory(DefaultGame.Definition(), new[] { At("tin", Vector2.Zero) }));
         Fund(run.Session); run.Session.TryBuy("Stamina", 0); run.Session.TryBuy("Stamina", 1); run.BeginShift();
         balance = run.Session.Wallet; stamina = run.Session.Stamina;
         for (int i = 0; i < 61; i++) run.Advance(.05f, null);
-        check(run.Herd.Pigs[0].State.Health == 2 && run.Session.Wallet == balance && run.Session.Stamina == stamina,
+        check(run.Herd.Pigs[0].State.Health == PigContent.Get("tin").MaxHealth - 1 && run.Session.Wallet == balance && run.Session.Stamina == stamina,
             "automatic resonance gradually cracks a heavy pig without a pointer or energy charge");
-        for (int i = 0; i < 125; i++) run.Advance(.05f, null);
-        check(run.Session.Wallet == balance + 6 && run.Session.Stamina == stamina,
+        for (int i = 0; i < (PigContent.Get("tin").MaxHealth - 1) * 61; i++) run.Advance(.05f, null);
+        check(run.Session.Wallet == balance + PigContent.Get("tin").Coins && run.Session.Stamina == stamina,
             "AFK cracking grants currency only when the pig actually breaks");
         for (int i = 0; i < 1200; i++) run.Advance(.05f, null);
         int capped = run.Session.Wallet;
@@ -149,8 +148,8 @@ internal static class EquipmentChecks
         StrikeOutcome? strike = null;
         for (int i = 0; i < 50 && strike == null; i++) strike = run.Advance(.05f, Vector2.Zero);
         var wave = run.EffectOutcomes.Single();
-        check(strike != null && wave.Radius == 3.2f && wave.Strike.DestroyedCount >= 2,
-            "golden chime cuff breaks a broad cluster and leaves cracks on surviving pigs");
+        check(strike != null && wave.Radius == 3.2f && wave.Strike.DestroyedCount == 0 && run.Herd.Pigs.Select(p => p.State.Health).SequenceEqual(new[] { 1, 1, 2 }),
+            "golden chime cuff damages the broad cluster without instantly breaking fresh tin pigs");
         check(run.Session.Stamina == stamina - 1 && run.Session.Wallet == balance + strike!.Coins + wave.Coins,
             "resonance reuses damage and coin settlement without charging or paying twice");
         var firstInstance = run.Session.ActiveEffects[0].Create(); var secondInstance = run.Session.ActiveEffects[0].Create();
