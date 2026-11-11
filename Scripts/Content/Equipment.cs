@@ -39,7 +39,7 @@ public static class EquipmentContent
                 Glow: "ffac58"
             ),
             StatsText(weapon, first),
-            UpgradeBonus: first
+            upgradeBonus: first
         ),
         new EquipmentTier(
             $"钴钢{noun}",
@@ -51,7 +51,7 @@ public static class EquipmentContent
                 Glow: "5cdff4"
             ),
             StatsText(weapon, first.Add(later)),
-            UpgradeBonus: later
+            upgradeBonus: later
         ),
         new EquipmentTier(
             $"星辉{noun}",
@@ -63,14 +63,14 @@ public static class EquipmentContent
                 Glow: "ef95ff"
             ),
             StatsText(weapon, first.Add(later).Add(later)),
-            UpgradeBonus: later
+            upgradeBonus: later
         )
     });
 
-    private static string StatsText(WeaponDefinition weapon, Bonus bonus)
+    private static FormattableString StatsText(WeaponDefinition weapon, Bonus bonus)
     {
         var stats = weapon.Attack.Stats(BalanceContent.Tuning, bonus);
-        return FormattableString.Invariant($"伤害 {stats.Damage} · 半径 {stats.Radius:0.00} · 体力 +{bonus.Stamina} · 每击耗能 {stats.StaminaCost}（不含护腕与技能）");
+        return $"伤害 {stats.Damage} · 半径 {stats.Radius:0.00} · 体力 +{bonus.Stamina} · 每击耗能 {stats.StaminaCost}（不含护腕与技能）";
     }
 
     private static IReadOnlyList<EquipmentTier> Cuffs { get; } = Array.AsReadOnly(new[]

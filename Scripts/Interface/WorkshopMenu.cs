@@ -2,6 +2,7 @@ using Godot;
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using static GameText;
 using static WorkshopStyle;
 
 /// <summary>
@@ -9,7 +10,7 @@ using static WorkshopStyle;
 /// </summary>
 public enum MenuPage
 {
-    None, Title, Receipt, Equipment, Skills, Reward, Ledger, Pause, Help, EndDay, Restart
+    None, Title, Receipt, Equipment, Skills, Reward, Ledger, Pause, Help, EndDay, Restart, Settings
 }
 
 /// <summary>
@@ -21,6 +22,7 @@ public partial class WorkshopMenu : Control
     public bool SpatialCatalogs { get; set; }
 
     public event Action? Start, EndDay, Restart, Resume, Equipment, Skills, Fullscreen, Quit;
+    public event Action? LanguageChanged;
     public event Action<string, int>? Purchase;
     public event Action<string>? Equip;
     public event Action<string>? Learn;
@@ -141,19 +143,55 @@ public partial class WorkshopMenu : Control
         parent.AddChild(new ColorRect { Color = new Color(.74f, .63f, .43f, .3f), CustomMinimumSize = new(0, 1), MouseFilter = MouseFilterEnum.Ignore });
     }
 
-    private static void Back(Control parent, Action action, string text = "返回")
+    private static void Back(Control parent, Action action, string? text = null)
     {
-        parent.AddChild(Button(text, action, "Back"));
+        parent.AddChild(Button(text ?? T("返回"), action, "Back"));
     }
 
     public void ShowTitle()
     {
-        var body = Open(MenuPage.Title, "COINPIG", "还 款 日", new(680, 540));
-        body.AddChild(new Control { CustomMinimumSize = new(0, 24), MouseFilter = MouseFilterEnum.Ignore });
-        body.AddChild(Button("开始游戏", () => Start?.Invoke(), "Start", true));
-        body.AddChild(Button("玩法", () => ShowHelp(ShowTitle), "Help"));
-        body.AddChild(Button("全屏 / 窗口   [F11]", () => Fullscreen?.Invoke(), "Fullscreen"));
-        body.AddChild(Button("退出游戏", () => Quit?.Invoke(), "Quit"));
+        var body = Open(MenuPage.Title, "COINPIG", T("还 款 日"), new(680, 540));
+        AddLanguageChoices(body, ShowTitle);
+        body.AddChild(Button(T("开始游戏"), () => Start?.Invoke(), "Start", true));
+        body.AddChild(Button(T("玩法"), () => ShowHelp(ShowTitle), "Help"));
+        body.AddChild(Button(T("设置"), () => ShowSettings(ShowTitle), "Settings"));
+        body.AddChild(Button(T("退出游戏"), () => Quit?.Invoke(), "Quit"));
+    }
+
+    private void ShowSettings(Action back)
+    {
+        var body = Open(MenuPage.Settings, T("设置"), T("语言"), new(500, 340), back);
+        AddLanguageChoices(body, () => ShowSettings(back));
+        body.AddChild(Button(T("全屏 / 窗口   [F11]"), () => Fullscreen?.Invoke(), "Fullscreen"));
+        Back(body, back);
+    }
+
+    private void AddLanguageChoices(Control parent, Action refresh)
+    {
+        var row = Row(parent);
+        AddChoice(GameLanguage.Chinese, "简体中文", "LanguageChinese");
+        AddChoice(GameLanguage.English, "English", "LanguageEnglish");
+
+        void AddChoice(GameLanguage language, string name, string id)
+        {
+            var button = Button(name, () =>
+            {
+                if (language == Language)
+                {
+                    return;
+                }
+
+                SetLanguage(language);
+                LanguageChanged?.Invoke();
+                refresh();
+                if (_body?.FindChild(id, true, false) is Button updated)
+                {
+                    updated.GrabFocus();
+                }
+            }, id, language == Language);
+            button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            row.AddChild(button);
+        }
     }
 
     public void ShowReceipt(SessionSnapshot state)
@@ -161,38 +199,38 @@ public partial class WorkshopMenu : Control
         var receipt = state.Receipt!;
         bool failed = state.Phase == ShiftPhase.Bankrupt;
         bool complete = state.Phase == ShiftPhase.Won;
-        string title = failed ? "租约终止" : complete ? "本期租约完成" : $"第 {state.Day} 天 · 结算";
-        var body = Open(MenuPage.Receipt, title, failed ? $"本期租金还差 ¥{receipt.Shortfall}" : complete
-            ? $"{state.ContractLength} 局租约完成 · 无尽模式不再收租" : "今日营业结束", new(600, 640));
+        string title = failed ? T("租约终止") : complete ? T("本期租约完成") : T("第 {0} 天 · 结算", state.Day);
+        var body = Open(MenuPage.Receipt, title, failed ? T("本期租金还差 ¥{0}", receipt.Shortfall) : complete
+            ? T("{0} 局租约完成 · 无尽模式不再收租", state.ContractLength) : T("今日营业结束"), new(600, 640));
         body.AddThemeConstantOverride("separation", 12);
         Rule(body);
-        AddLedgerLine(body, "击碎", $"{receipt.Pigs} 只");
-        AddLedgerLine(body, "收入", $"+ ¥{receipt.Earnings}");
-        AddLedgerLine(body, "租金", $"− ¥{receipt.Paid}");
+        AddLedgerLine(body, T("击碎"), T("{0} 只", receipt.Pigs));
+        AddLedgerLine(body, T("收入"), $"+ ¥{receipt.Earnings}");
+        AddLedgerLine(body, T("租金"), $"− ¥{receipt.Paid}");
         Rule(body);
-        AddLedgerLine(body, "余额", $"¥ {state.Wallet}", 30);
+        AddLedgerLine(body, T("余额"), $"¥ {state.Wallet}", 30);
         if (!failed && state.NextBill is Bill next)
         {
-            body.AddChild(Label($"下次租金：第 {next.Shift} 天 ¥{next.Amount} · 还需准备 ¥{Math.Max(0, next.Amount - state.Wallet)}", 18, Muted, true));
+            body.AddChild(Label(T("下次租金：第 {0} 天 ¥{1} · 还需准备 ¥{2}", next.Shift, next.Amount, Math.Max(0, next.Amount - state.Wallet)), 18, Muted, true));
         }
 
         if (!failed && !complete)
         {
             var row = Row(body);
-            var shop = Button("装备", () => Equipment?.Invoke(), "Equipment");
-            var skills = Button("技能", () => Skills?.Invoke(), "Skills");
+            var shop = Button(T("装备"), () => Equipment?.Invoke(), "Equipment");
+            var skills = Button(T("技能"), () => Skills?.Invoke(), "Skills");
             shop.SizeFlagsHorizontal = skills.SizeFlagsHorizontal = SizeFlags.ExpandFill;
             row.AddChild(shop);
             row.AddChild(skills);
         }
         if (!failed)
         {
-            body.AddChild(Button(complete ? "进入无尽模式" : "开始下一天", () => Start?.Invoke(), "Next", true));
+            body.AddChild(Button(complete ? T("进入无尽模式") : T("开始下一天"), () => Start?.Invoke(), "Next", true));
         }
 
         if (failed || complete)
         {
-            body.AddChild(Button("重新开始", () => Restart?.Invoke(), "Restart", failed));
+            body.AddChild(Button(T("重新开始"), () => Restart?.Invoke(), "Restart", failed));
         }
     }
 
@@ -215,7 +253,7 @@ public partial class WorkshopMenu : Control
             ShowGallery(null, skills, state);
             return;
         }
-        var body = Open(MenuPage.Skills, "技能", $"余额 ¥{state.Wallet}", new(1280, 710), () => ShowReceipt(state));
+        var body = Open(MenuPage.Skills, T("技能"), T("余额 ¥{0}", state.Wallet), new(1280, 710), () => ShowReceipt(state));
         Rule(body);
         var columns = Row(body, 22);
         var offers = skills.GetSkills();
@@ -224,7 +262,7 @@ public partial class WorkshopMenu : Control
             var branch = group.Key;
             var column = Column(columns, 14);
             column.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-            string name = branch.Name;
+            string name = T(branch.Name);
             column.AddChild(Label(name, 24, Brass));
             foreach (var offer in group)
             {
@@ -233,18 +271,18 @@ public partial class WorkshopMenu : Control
                 panel.AddThemeStyleboxOverride("panel", Surface(new Color(.17f, .15f, .11f, .7f), new Color(.5f, .42f, .29f, .4f), 12));
                 column.AddChild(panel);
                 var content = Column(panel, 6);
-                content.AddChild(Label(skill.Name, 21));
-                content.AddChild(Label(skill.Description, 16, Muted, true));
+                content.AddChild(Label(T(skill.Name), 21));
+                content.AddChild(Label(T(skill.Description), 16, Muted, true));
                 if (skill.ParentId != null)
                 {
-                    content.AddChild(Label("前置：" + (offers.FirstOrDefault(s => s.Skill.Id == skill.ParentId)?.Skill.Name ?? skill.ParentId), 14, Muted));
+                    content.AddChild(Label(T("前置：{0}", T(offers.FirstOrDefault(s => s.Skill.Id == skill.ParentId)?.Skill.Name ?? skill.ParentId)), 14, Muted));
                 }
 
                 string label = offer.Status switch
                 {
-                    SkillStatus.Learned => "已学会",
-                    SkillStatus.Locked => "未解锁",
-                    _ => $"学习 ¥{skill.Cost}"
+                    SkillStatus.Learned => T("已学会"),
+                    SkillStatus.Locked => T("未解锁"),
+                    _ => T("学习 ¥{0}", skill.Cost)
                 };
                 var button = Button(label, () => Learn?.Invoke(skill.Id), "Learn_" + skill.Id);
                 button.CustomMinimumSize = new(0, 36);
@@ -253,7 +291,7 @@ public partial class WorkshopMenu : Control
                 content.AddChild(button);
             }
         }
-        Back(body, () => ShowReceipt(state), "返回结算");
+        Back(body, () => ShowReceipt(state), T("返回结算"));
     }
 
     private void ShowGallery(IShopView? shop, ISkillTreeView? skills, SessionSnapshot state)
@@ -276,11 +314,11 @@ public partial class WorkshopMenu : Control
         bar.AddThemeStyleboxOverride("panel", barStyle);
         body.AddChild(bar);
         var tabs = Row(bar, 16);
-        var back = Button("返回结算", () => ShowReceipt(state), "Back", false, true);
+        var back = Button(T("返回结算"), () => ShowReceipt(state), "Back", false, true);
         back.CustomMinimumSize = new(160, 50);
         tabs.AddChild(back);
-        var equipmentTab = Button("商店", () => Equipment?.Invoke(), "EquipmentTab");
-        var skillTab = Button("技能树", () => Skills?.Invoke(), "SkillsTab");
+        var equipmentTab = Button(T("商店"), () => Equipment?.Invoke(), "EquipmentTab");
+        var skillTab = Button(T("技能树"), () => Skills?.Invoke(), "SkillsTab");
         equipmentTab.CustomMinimumSize = skillTab.CustomMinimumSize = new(150, 50);
         equipmentTab.Disabled = !training;
         skillTab.Disabled = training;
@@ -288,17 +326,17 @@ public partial class WorkshopMenu : Control
         StyleTab(skillTab);
         tabs.AddChild(equipmentTab);
         tabs.AddChild(skillTab);
-        var balance = Label($"金币 ¥{state.Wallet}", 22, Brass);
+        var balance = Label(T("金币 ¥{0}", state.Wallet), 22, Brass);
         balance.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         balance.VerticalAlignment = VerticalAlignment.Center;
         tabs.AddChild(balance);
-        tabs.AddChild(Button("查看租金", () => ShowLedger(state, () => { if (training) { Skills?.Invoke(); } else { Equipment?.Invoke(); } }), "ViewRent", false, true));
-        tabs.AddChild(Button($"进入第 {state.Day + 1} 局", () => Start?.Invoke(), "Next", true, true));
+        tabs.AddChild(Button(T("查看租金"), () => ShowLedger(state, () => { if (training) { Skills?.Invoke(); } else { Equipment?.Invoke(); } }), "ViewRent", false, true));
+        tabs.AddChild(Button(T("进入第 {0} 局", state.Day + 1), () => Start?.Invoke(), "Next", true, true));
         body.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore });
         var footer = new PanelContainer { CustomMinimumSize = new(0, 82) };
         footer.AddThemeStyleboxOverride("panel", barStyle);
         body.AddChild(footer);
-        _notice!.Text = training ? "沿金线解锁技能，使用金币购买。" : "I 锤具与护腕 → II 电锯 → III 砂轮 · 已购武器可免费切换。";
+        _notice!.Text = training ? T("沿金线解锁技能，使用金币购买。") : T("I 锤具与护腕 → II 电锯 → III 砂轮 · 已购武器可免费切换。");
         _notice.VerticalAlignment = VerticalAlignment.Center;
         footer.AddChild(_notice);
         gallery.Purchase += (id, level) => Purchase?.Invoke(id, level);
@@ -319,7 +357,7 @@ public partial class WorkshopMenu : Control
 
     public void ShowRewards(SessionSnapshot state)
     {
-        var body = Open(MenuPage.Reward, "选择一项能力", $"租金已付 ¥{state.Receipt?.Paid ?? 0} · 当前金币 ¥{state.Wallet}", new(1180, 620));
+        var body = Open(MenuPage.Reward, T("选择一项能力"), T("租金已付 ¥{0} · 当前金币 ¥{1}", state.Receipt?.Paid ?? 0, state.Wallet), new(1180, 620));
         var row = Row(body, 24);
         foreach (var card in state.Perks)
         {
@@ -346,12 +384,12 @@ public partial class WorkshopMenu : Control
 
             var column = Column(margin, 18);
             column.MouseFilter = MouseFilterEnum.Ignore;
-            var title = Label(card.Name, 27, Brass);
+            var title = Label(T(card.Name), 27, Brass);
             title.HorizontalAlignment = HorizontalAlignment.Center;
             column.AddChild(title);
             column.AddChild(new RewardEmblem { Emblem = card.Emblem, CustomMinimumSize = new(0, 160), MouseFilter = MouseFilterEnum.Ignore });
             Rule(column);
-            var description = Label(card.Description, 20, Text, true);
+            var description = Label(Describe(card.Description, card.DescriptionFormat), 20, Text, true);
             description.CustomMinimumSize = new(0, 104);
             description.HorizontalAlignment = HorizontalAlignment.Center;
             description.VerticalAlignment = VerticalAlignment.Center;
@@ -362,11 +400,11 @@ public partial class WorkshopMenu : Control
     public void ShowLedger(SessionSnapshot state, Action? back = null)
     {
         Action returnToPrevious = back ?? (() => Resume?.Invoke());
-        var body = Open(MenuPage.Ledger, "租约", $"余额 ¥{state.Wallet}", new(650, 600), returnToPrevious);
+        var body = Open(MenuPage.Ledger, T("租约"), T("余额 ¥{0}", state.Wallet), new(650, 600), returnToPrevious);
         Rule(body);
         if (state.NextBill is Bill next)
         {
-            body.AddChild(Label($"下次：第 {next.Shift} 天 ¥{next.Amount} · 当前缺口 ¥{Math.Max(0, next.Amount - state.Wallet)}", 20, Brass, true));
+            body.AddChild(Label(T("下次：第 {0} 天 ¥{1} · 当前缺口 ¥{2}", next.Shift, next.Amount, Math.Max(0, next.Amount - state.Wallet)), 20, Brass, true));
         }
 
         var scroll = new ScrollContainer
@@ -384,7 +422,9 @@ public partial class WorkshopMenu : Control
         Control? upcoming = null;
         foreach (var due in state.Schedule)
         {
-            var line = AddLedgerLine(rows, $"{(due.Renewal ? "续租 " : "")}第 {due.Day} 天  ·  ¥{due.Amount}", GameText.Deadline(due));
+            string label = due.Renewal ? T("续租 第 {0} 天  ·  ¥{1}", due.Day, due.Amount)
+                : T("第 {0} 天  ·  ¥{1}", due.Day, due.Amount);
+            var line = AddLedgerLine(rows, label, GameText.Deadline(due));
             if (!due.Paid && upcoming == null)
             {
                 upcoming = line;
@@ -395,41 +435,41 @@ public partial class WorkshopMenu : Control
             Callable.From(() => { if (GodotObject.IsInstanceValid(scroll)) { scroll.EnsureControlVisible(upcoming); } }).CallDeferred();
         }
 
-        body.AddChild(Label("第 10 局结清房租后进入无尽模式，不再收租。", 17, Muted, true));
+        body.AddChild(Label(T("第 10 局结清房租后进入无尽模式，不再收租。"), 17, Muted, true));
         Rule(body);
-        Back(body, returnToPrevious, back == null ? "返回营业" : "返回工坊");
+        Back(body, returnToPrevious, back == null ? T("返回营业") : T("返回工坊"));
     }
 
     public void ShowPause()
     {
-        var body = Open(MenuPage.Pause, "暂停", "", new(440, 420), () => Resume?.Invoke());
-        body.AddChild(Button("继续游戏", () => Resume?.Invoke(), "Resume", true));
-        body.AddChild(Button("玩法", () => ShowHelp(ShowPause), "Help"));
-        body.AddChild(Button("全屏 / 窗口   [F11]", () => Fullscreen?.Invoke(), "Fullscreen"));
-        body.AddChild(Button("重新开始", ShowRestart, "Restart"));
-        body.AddChild(Button("退出游戏", () => Quit?.Invoke(), "Quit"));
+        var body = Open(MenuPage.Pause, T("暂停"), "", new(440, 420), () => Resume?.Invoke());
+        body.AddChild(Button(T("继续游戏"), () => Resume?.Invoke(), "Resume", true));
+        body.AddChild(Button(T("玩法"), () => ShowHelp(ShowPause), "Help"));
+        body.AddChild(Button(T("设置"), () => ShowSettings(ShowPause), "Settings"));
+        body.AddChild(Button(T("重新开始"), ShowRestart, "Restart"));
+        body.AddChild(Button(T("退出游戏"), () => Quit?.Invoke(), "Quit"));
     }
 
     private void ShowRestart()
     {
-        var body = Open(MenuPage.Restart, "重新开始？", "本局的金币和升级将清空。", new(500, 270), ShowPause);
-        body.AddChild(Button("重新开始", () => Restart?.Invoke(), "ConfirmRestart", true));
-        Back(body, ShowPause, "取消");
+        var body = Open(MenuPage.Restart, T("重新开始？"), T("本局的金币和升级将清空。"), new(500, 270), ShowPause);
+        body.AddChild(Button(T("重新开始"), () => Restart?.Invoke(), "ConfirmRestart", true));
+        Back(body, ShowPause, T("取消"));
     }
 
     public void ShowEndDay(int stamina)
     {
-        var body = Open(MenuPage.EndDay, "提前收工？", $"还剩 {stamina} 点体力。收工后结算收入，并支付到期租金。", new(600, 270), () => Resume?.Invoke());
-        body.AddChild(Button("收工", () => EndDay?.Invoke(), "ConfirmEnd", true));
-        Back(body, () => Resume?.Invoke(), "继续营业");
+        var body = Open(MenuPage.EndDay, T("提前收工？"), T("还剩 {0} 点体力。收工后结算收入，并支付到期租金。", stamina), new(600, 270), () => Resume?.Invoke());
+        body.AddChild(Button(T("收工"), () => EndDay?.Invoke(), "ConfirmEnd", true));
+        Back(body, () => Resume?.Invoke(), T("继续营业"));
     }
 
     private void ShowHelp(Action back)
     {
-        var body = Open(MenuPage.Help, "玩法", "", new(780, 620), back);
+        var body = Open(MenuPage.Help, T("玩法"), "", new(900, 640), back);
         string pigs = string.Join("\n", PigDefinitions.Select(pig =>
-            $"{pig.Name}：{pig.MaxHealth} 点耐久，速度 ×{pig.Speed:0.##}，击碎 ¥{pig.Coins}。"));
-        body.AddChild(Label($"移动鼠标瞄准，工具会自动连续攻击，无需点击。\n开局有准备时间，瞄准猪后才开始；快速换目标会短暂缓攻。\n空击也消耗体力；将鼠标移出桌面可停止新的攻击。\n\n{pigs}\n工具升级会提高伤害、范围和体力，技能可叠加。\n当前商店的工具每次攻击均耗能 1。\n护腕共振每局有次数上限，升级后强化效果。\n\n主线共 10 局，每 2 局交租，第 10 局支付最后一笔；按 B 查看账单。\n余额不足则破产，收工后可买装备、学技能。\n中途交租成功后可选能力；第 6 局起加入装甲猪。\n结清房租后进入无尽模式，保留金币和升级，不再收租。", 21, Text, true));
+            T("{0}：{1} 点耐久，速度 ×{2:0.##}，击碎 ¥{3}。", T(pig.Name), pig.MaxHealth, pig.Speed, pig.Coins)));
+        body.AddChild(Label(T("移动鼠标瞄准，工具会自动连续攻击，无需点击。\n开局有准备时间，瞄准猪后才开始；快速换目标会短暂缓攻。\n空击也消耗体力；将鼠标移出桌面可停止新的攻击。\n\n{0}\n工具升级会提高伤害、范围和体力，技能可叠加。\n当前商店的工具每次攻击均耗能 1。\n护腕共振每局有次数上限，升级后强化效果。\n\n主线共 10 局，每 2 局交租，第 10 局支付最后一笔；按 B 查看账单。\n余额不足则破产，收工后可买装备、学技能。\n中途交租成功后可选能力；第 6 局起加入装甲猪。\n结清房租后进入无尽模式，保留金币和升级，不再收租。", pigs), 21, Text, true));
         Back(body, back);
     }
 }

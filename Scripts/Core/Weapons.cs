@@ -86,7 +86,16 @@ public sealed record EquipmentPalette(string Body, string Trim, string Metal, st
 /// 某一级装备的外观、效果和属性增量。Effects 表示当前等级效果，不叠加已替代的旧等级。
 /// </summary>
 public sealed record EquipmentTier(string Name, EquipmentPalette Palette, string Description = "",
-    IReadOnlyList<CombatEffectDefinition>? Effects = null, Bonus? UpgradeBonus = null);
+    IReadOnlyList<CombatEffectDefinition>? Effects = null, Bonus? UpgradeBonus = null)
+{
+    public FormattableString? DescriptionFormat { get; }
+
+    public EquipmentTier(string name, EquipmentPalette palette, FormattableString descriptionFormat, Bonus upgradeBonus)
+        : this(name, palette, FormattableString.Invariant(descriptionFormat), UpgradeBonus: upgradeBonus)
+    {
+        DescriptionFormat = descriptionFormat;
+    }
+}
 
 /// <summary>
 /// 商品解锁需要的前置商品编号和已购买等级。

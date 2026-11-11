@@ -48,11 +48,12 @@ internal static class EquipmentScenario
             Check(g.Interface.FindChildren("Buy_*", "Button", true, false).OfType<Button>().Count(b => b.IsVisibleInTree()) == 12,
                 "shop renders all four product columns and three upgrade levels");
             var catalog = g.Session.GetOffers();
-            Check(GameText.LockReason(catalog.Single(offer => offer.Product.Id == "Chainsaw"), catalog) == "加宽锤面 Lv.2、共振护腕 Lv.1",
+            Check(GameText.LockReason(catalog.Single(offer => offer.Product.Id == "Chainsaw"), catalog) ==
+                $"{GameText.T("加宽锤面")} Lv.2{GameText.T("、")}{GameText.T("共振护腕")} Lv.1",
                 "the UI formats prerequisite data without moving unlock rules out of the core");
             int wallet = g.Session.Wallet;
             Press(g, "Buy_Grinder");
-            Check(g.Session.Wallet == wallet && g.Interface.Menu.NoticeText.Contains("解锁"), "locked final-stage equipment explains prerequisites without charging");
+            Check(g.Session.Wallet == wallet && g.Interface.Menu.NoticeText.StartsWith(GameText.T("解锁需要：{0}", "")), "locked final-stage equipment explains prerequisites without charging");
             await Capture(g, "01-shop-catalog");
             g.Interface.FindChildren("Buy_Stamina_Tier_1", "Button", true, false).OfType<Button>().First(b => b.IsVisibleInTree()).GrabFocus();
             await Capture(g, "01b-cuff-details");

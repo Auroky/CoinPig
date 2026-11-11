@@ -54,6 +54,89 @@ internal static class ScenarioRunner
         var error = image.SavePng(Path.Combine(args[at + 1], name + ".png"));
         Check(error == Error.Ok, "capture " + name);
     }
+
+    public static async Task RunLanguageChecks(Workshop g)
+    {
+        try
+        {
+            await g.ToSignal(g.GetTree(), SceneTree.SignalName.ProcessFrame);
+            var menu = g.Interface.Menu;
+            Press(g, "LanguageChinese");
+            Check(VisibleButton("Start").Text == "开始游戏", "Chinese is available on the title screen");
+            Press(g, "LanguageEnglish");
+            Check(VisibleButton("Start").Text == "Start Game", "the title screen switches immediately to English");
+            GameText.LoadLanguage();
+            Check(GameText.Language == GameLanguage.English, "the English choice survives reloading preferences");
+            await CheckPage("language-01-title");
+
+            Press(g, "Help");
+            await CheckPage("language-02-help");
+            Press(g, "Back");
+            Press(g, "Start");
+            await CheckPage("language-03-hud");
+            Press(g, "Ledger");
+            await CheckPage("language-04-ledger");
+            Press(g, "Back");
+            Press(g, "Pause");
+            Press(g, "Settings");
+            await CheckPage("language-05-settings");
+            var session = g.Session;
+            var state = SessionSnapshot.From(session);
+            Press(g, "LanguageChinese");
+            Check(menu.Page == MenuPage.Settings && VisibleButton("Back").Text == "返回", "pause settings switch back to Chinese");
+            Press(g, "Back");
+            Check(menu.Page == MenuPage.Pause && VisibleButton("Resume").Text == "继续游戏", "settings return to the localized pause menu");
+            Press(g, "Resume");
+            Check(ReferenceEquals(session, g.Session) && g.Session.Phase == ShiftPhase.Working &&
+                g.Session.Shift == state.Day && g.Session.Wallet == state.Wallet && g.Session.Stamina == state.Stamina,
+                "language changes preserve the active shift, wallet and stamina");
+
+            Press(g, "Pause");
+            Press(g, "Settings");
+            Press(g, "LanguageEnglish");
+            Press(g, "Back");
+            Press(g, "Resume");
+            Press(g, "EndDay");
+            Press(g, "ConfirmEnd");
+            await CheckPage("language-06-summary");
+            Press(g, "Equipment");
+            Check(VisibleButton("Buy_Rim").TooltipText.Contains("Damage 1"), "weapon descriptions format live stats in English");
+            await CheckPage("language-07-shop");
+            Press(g, "SkillsTab");
+            await CheckPage("language-08-skills");
+            var receipt = SessionSnapshot.From(g.Session);
+            menu.ShowRewards(receipt with { Perks = PerkContent.Cards.Take(3).ToArray() });
+            await CheckPage("language-09-perks");
+            Check(PerkContent.Cards.All(card => !HasChinese(GameText.Describe(card.Description, card.DescriptionFormat))),
+                "all perk descriptions translate with their configured values");
+            g.GetTree().Quit();
+        }
+        catch (Exception error)
+        {
+            GD.PushError(error.ToString());
+            g.GetTree().Quit(1);
+        }
+
+        Button VisibleButton(string name) => g.Interface.FindChildren(name, "Button", true, false)
+            .OfType<Button>().First(button => button.IsVisibleInTree());
+
+        static bool HasChinese(string text) => text.Any(character => character is >= '\u4e00' and <= '\u9fff');
+
+        async Task CheckPage(string name)
+        {
+            var controls = g.Interface.FindChildren("*", "Control", true, false).OfType<Control>()
+                .Where(control => control.IsVisibleInTree());
+            Check(controls.All(control => !HasChinese(control.TooltipText) && (control switch
+            {
+                Button button => button.Name.ToString() == "LanguageChinese" || !HasChinese(button.Text),
+                Label label => !HasChinese(label.Text),
+                _ => true
+            })) && g.FindChildren("*", "Label3D", true, false).OfType<Label3D>()
+                .Where(label => label.IsVisibleInTree()).All(label => !HasChinese(label.Text)), name + " is localized");
+            await Capture(g, name);
+        }
+    }
+
     public static async Task Run(Workshop g)
     {
         try
@@ -165,7 +248,7 @@ internal static class ScenarioRunner
             Press(g, "Back");
             Press(g, "Equipment"); int wallet = g.Session.Wallet;
             if (DisplayServer.GetName() == "headless") Press(g, "Buy_Rim"); else await Click(g, "Buy_Rim");
-            Check(g.Session.Wallet == wallet && g.Interface.Menu.NoticeText.Contains("余额不足"), "physical catalogue click is routed correctly and failed purchases preserve balance");
+            Check(g.Session.Wallet == wallet && g.Interface.Menu.NoticeText.Contains(GameText.T("余额不足")), "physical catalogue click is routed correctly and failed purchases preserve balance");
             await Capture(g, "04-shop");
             if (g.SpatialCatalogs)
             {

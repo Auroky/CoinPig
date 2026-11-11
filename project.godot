@@ -28,6 +28,11 @@ window/stretch/aspect="expand"
 
 project/assembly_name="CoinPig"
 
+[internationalization]
+
+locale/translations=PackedStringArray("res://Translations/en.po")
+locale/fallback="zh_CN"
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

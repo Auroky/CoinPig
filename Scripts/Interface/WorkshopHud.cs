@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using static GameText;
 using static WorkshopStyle;
 
 /// <summary>
@@ -35,7 +36,7 @@ public partial class WorkshopHud : Control
     public override void _Ready()
     {
         MouseFilter = MouseFilterEnum.Ignore;
-        _round = Label("", 22, Brass);
+        _round = Label("", 20, Brass);
         _wallet = Label("", 24, Brass);
         _score = Label("", 22);
         _hint = Label("", 18, Muted);
@@ -43,9 +44,9 @@ public partial class WorkshopHud : Control
         _walletPanel = Pill(_wallet);
         _scorePanel = Pill(_score);
         _hintPanel = Pill(_hint, 10);
-        _end = Button("提前收工  [E]", () => EndDay?.Invoke(), "EndDay", false, true);
-        _ledger = Button("查看账单  [B]", () => Ledger?.Invoke(), "Ledger", false, true);
-        _pause = Button("暂停  [Esc]", () => Pause?.Invoke(), "Pause", false, true);
+        _end = Button("", () => EndDay?.Invoke(), "EndDay", false, true);
+        _ledger = Button("", () => Ledger?.Invoke(), "Ledger", false, true);
+        _pause = Button("", () => Pause?.Invoke(), "Pause", false, true);
         _impact = Label("", 32, Text, true);
         _impact.HorizontalAlignment = HorizontalAlignment.Center;
         _impact.AddThemeColorOverride("font_outline_color", new("57382a"));
@@ -59,6 +60,15 @@ public partial class WorkshopHud : Control
         Resized += Arrange;
         Arrange();
         ResetFeedback();
+        RefreshLanguage();
+    }
+
+    public void RefreshLanguage()
+    {
+        _end.Text = T("提前收工  [E]");
+        _pause.Text = T("暂停  [Esc]");
+        _impactLeft = 0;
+        _impact.Hide();
     }
 
     private PanelContainer Pill(Label label, int radius = 29)
@@ -96,22 +106,22 @@ public partial class WorkshopHud : Control
 
     public void Refresh(SessionSnapshot state)
     {
-        string day = state.Endless ? $"无尽 · 第 {state.Day} 局" : $"第 {state.Day}/{state.ContractLength} 局";
-        _round.Text = $"{day}   体力 {state.Stamina} / {state.Capacity}";
-        _wallet.Text = $"余额  ¥{state.Wallet}";
-        _score.Text = $"击碎 {_lastBroken} 只   /   最佳 {_bestBroken} 只";
+        string day = state.Endless ? T("无尽 · 第 {0} 局", state.Day) : T("第 {0}/{1} 局", state.Day, state.ContractLength);
+        _round.Text = T("{0}   体力 {1} / {2}", day, state.Stamina, state.Capacity);
+        _wallet.Text = T("余额  ¥{0}", state.Wallet);
+        _score.Text = T("击碎 {0} 只   /   最佳 {1} 只", _lastBroken, _bestBroken);
         if (state.NextBill is Bill bill)
         {
             int remaining = bill.Shift - state.Day;
-            string due = remaining <= 0 ? "今天" : remaining == 1 ? "明天" : $"{remaining} 天后";
-            _ledger.Text = $"租金 ¥{bill.Amount} · {due}  [B]";
+            string due = remaining <= 0 ? T("今天") : remaining == 1 ? T("明天") : T("{0} 天后", remaining);
+            _ledger.Text = T("租金 ¥{0} · {1}  [B]", bill.Amount, due);
         }
         else
         {
-            _ledger.Text = "租金已缴清 · 查看  [B]";
+            _ledger.Text = T("租金已缴清 · 查看  [B]");
         }
 
-        _hint.Text = $"{state.WeaponName} Lv.{state.WeaponLevel} · 伤害 {state.Damage} · 耗能 {state.AttackCost} · 自动攻击";
+        _hint.Text = T("{0} Lv.{1} · 伤害 {2} · 耗能 {3} · 自动攻击", T(state.WeaponName), state.WeaponLevel, state.Damage, state.AttackCost);
     }
 
     public void Notify(string text) => _hint.Text = text;
@@ -121,10 +131,10 @@ public partial class WorkshopHud : Control
         _impactAnchor = anchor;
         _lastBroken = strike.DestroyedCount;
         _bestBroken = Math.Max(_bestBroken, _lastBroken);
-        _score.Text = $"击碎 {_lastBroken} 只   /   最佳 {_bestBroken} 只";
+        _score.Text = T("击碎 {0} 只   /   最佳 {1} 只", _lastBroken, _bestBroken);
         _combo = _lastBroken >= 2;
-        _impact.Text = _combo ? $"{(_lastBroken == 2 ? "双响！" : "连碎！")} ×{_lastBroken}\n+¥{coins}" :
-            strike.HitCount == 0 ? "砸空了" : _lastBroken == 1 ? $"击碎 1 只  +¥{coins}" : $"命中 {strike.HitCount} 只 · 击碎 0 只";
+        _impact.Text = _combo ? $"{(_lastBroken == 2 ? T("双响！") : T("连碎！"))} ×{_lastBroken}\n+¥{coins}" :
+            strike.HitCount == 0 ? T("砸空了") : _lastBroken == 1 ? T("击碎 1 只  +¥{0}", coins) : T("命中 {0} 只 · 击碎 0 只", strike.HitCount);
         _impact.AddThemeFontSizeOverride("font_size", _combo ? 40 : 30);
         _impactLeft = _combo ? 1.10f : .85f;
         _impactAge = 0;
@@ -134,7 +144,7 @@ public partial class WorkshopHud : Control
     public void ShowEffect(Func<Vector2> anchor, EffectOutcome effect)
     {
         ShowImpact(anchor, effect.Strike, effect.Coins);
-        _impact.Text = effect.Name + "\n" + _impact.Text;
+        _impact.Text = T(effect.Name) + "\n" + _impact.Text;
     }
 
     public void PulseWallet()

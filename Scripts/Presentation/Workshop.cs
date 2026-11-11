@@ -2,6 +2,7 @@ using Godot;
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using static GameText;
 
 /// <summary>
 /// Godot 场景入口：组装运行流程与表现、转换输入坐标、连接界面命令，再呈现规则结果。
@@ -29,14 +30,19 @@ public partial class Workshop : Node2D
 
     public override void _Ready()
     {
+        LoadLanguage();
         _run = new WorkshopRun(Content);
         CreatePresentation();
         ConnectInterfaceCommands();
-        RefreshHud();
+        RefreshLanguage();
         Interface.Menu.ShowTitle();
         Interface.Hud.Hide();
 #if DEBUG
-        if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--verify-equipment") >= 0)
+        if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--verify-language") >= 0)
+        {
+            _ = ScenarioRunner.RunLanguageChecks(this);
+        }
+        else if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--verify-equipment") >= 0)
         {
             _ = EquipmentScenario.Run(this);
         }
@@ -96,6 +102,7 @@ public partial class Workshop : Node2D
         menu.Learn += LearnSkill;
         menu.Choose += ChoosePerk;
         menu.Fullscreen += ToggleFullscreen;
+        menu.LanguageChanged += RefreshLanguage;
         menu.Quit += () => GetTree().Quit();
         hud.EndDay += RequestEndShift;
         hud.Pause += PauseRun;
@@ -115,6 +122,13 @@ public partial class Workshop : Node2D
 
     private void RefreshHud() => Interface.Hud.Refresh(Snapshot);
 
+    private void RefreshLanguage()
+    {
+        GetWindow().Title = T("CoinPig · 还款日");
+        Interface.Hud.RefreshLanguage();
+        RefreshHud();
+    }
+
     private void OpenEquipment() => Interface.Menu.ShowEquipment(Session, Snapshot);
 
     private void OpenSkills() => Interface.Menu.ShowSkills(Session, Snapshot);
@@ -132,7 +146,7 @@ public partial class Workshop : Node2D
         var result = Session.TryEquip(id);
         RefreshHud();
         OpenEquipment();
-        Interface.Menu.Notify(result.Succeeded ? $"已装备 {Session.EquippedWeapon.Weapon.Name} · 无需额外金币" : "尚未拥有这件武器");
+        Interface.Menu.Notify(result.Succeeded ? T("已装备 {0} · 无需额外金币", T(Session.EquippedWeapon.Weapon.Name)) : T("尚未拥有这件武器"));
     }
 
     private void LearnSkill(string id)
@@ -170,8 +184,8 @@ public partial class Workshop : Node2D
         RefreshHud();
         var arrivals = Content.Pigs.All.Where(pig => pig.FirstShift == Session.Shift && pig.FirstShift > 1).ToArray();
         Interface.Hud.Notify(arrivals.Length > 0
-            ? string.Join(" · ", arrivals.Select(pig => $"{pig.Definition.Name}出现 · 耐久 {pig.Definition.MaxHealth}"))
-            : "开局准备 · 瞄准一只猪后自动挥锤，无需点击");
+            ? string.Join(" · ", arrivals.Select(pig => T("{0}出现 · 耐久 {1}", T(pig.Definition.Name), pig.Definition.MaxHealth)))
+            : T("开局准备 · 瞄准一只猪后自动挥锤，无需点击"));
     }
 
     private void RestartRun()
@@ -219,7 +233,7 @@ public partial class Workshop : Node2D
 
         if (_run.Hammer.Pending)
         {
-            Interface.Hud.Notify("等待本次攻击完成");
+            Interface.Hud.Notify(T("等待本次攻击完成"));
             return;
         }
         if (Session.CanAttack && Interface.Menu.Page != MenuPage.EndDay)
@@ -346,8 +360,8 @@ public partial class Workshop : Node2D
             if (!_run.AutomaticAim.HasLanded && !_run.Hammer.Pending)
             {
                 Interface.Hud.Notify(_run.AutomaticAim.OpeningRemaining > 0
-                                ? $"开局准备 {_run.AutomaticAim.OpeningRemaining:0.0}s · 移动鼠标瞄准"
-                                : "瞄准一只猪，工具会自动攻击 · 无需点击");
+                                ? T("开局准备 {0:0.0}s · 移动鼠标瞄准", _run.AutomaticAim.OpeningRemaining)
+                                : T("瞄准一只猪，工具会自动攻击 · 无需点击"));
             }
 
             if (outcome != null)

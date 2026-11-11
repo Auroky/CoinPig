@@ -2,6 +2,7 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static GameText;
 
 /// <summary>
 /// 立体商店与技能板的展示。模型范围投影为可鼠标、键盘选择的按钮，只发出购买或学习意图。
@@ -128,7 +129,7 @@ public partial class UpgradeGallery : Control
         {
             var offer = offers[column];
             string lockReason = GameText.LockReason(offer, offers);
-            var heading = _art.Label(cabinet, $"{new string('I', offer.Product.Stage)} · {offer.Product.Name}",
+            var heading = _art.Label(cabinet, $"{new string('I', offer.Product.Stage)} · {T(offer.Product.Name)}",
                 new(-5.92f + (column + .5f) * columnWidth, 6.48f, 1.28f), 30, .0068f);
             heading.NoDepthTest = true;
             for (int tier = 0; tier < offer.Product.MaxLevel; tier++)
@@ -137,6 +138,7 @@ public partial class UpgradeGallery : Control
                 var item = new Node3D { Position = new(-5.92f + (column + .5f) * columnWidth, 6.61f - (tier + .5f) * rowHeight, .1f) };
                 _world.AddChild(item);
                 var visual = offer.Product.TierAt(tier);
+                string tierName = offer.Product.Tiers is { Count: > 0 } ? T(visual.Name) : T("等级 {0}", tier + 1);
                 var display = new Node3D
                 {
                     Position = new(0, .2f, 0),
@@ -150,10 +152,10 @@ public partial class UpgradeGallery : Control
                 bool owned = tier < offer.Level;
                 string status = ProductTierStatus(offer, tier);
                 SceneShapes.Box(item, new(0, -.62f, 1.08f), new(columnWidth - .3f, .68f, .06f), _materials.Paint("202e35"));
-                var caption = _art.Label(item, $"{visual.Name}\nLv.{tier + 1} · {status}", new(0, -.62f, 1.15f), 30, .0068f);
+                var caption = _art.Label(item, $"{tierName}\nLv.{tier + 1} · {status}", new(0, -.62f, 1.15f), 30, .0068f);
                 caption.Modulate = new(owned && tier == offer.Level - 1 ? "a9eee1" : tier == offer.Level && offer.Status != PurchaseStatus.Locked ? "ffe2a1" : "c0b8ac");
-                string description = $"{visual.Name} · Lv.{tier + 1} · ¥{offer.Product.PriceAt(tier)}  |  {offer.Product.Description.Replace("\n", " ")}  {visual.Description.Replace("\n", " ")}" +
-                    (lockReason.Length > 0 ? $"  |  解锁需要：{lockReason}" : "") + (owned && offer.Product.Weapon != null ? "  |  点击免费切换至该武器最高已购等级" : "");
+                string description = $"{tierName} · Lv.{tier + 1} · ¥{offer.Product.PriceAt(tier)}  |  {T(offer.Product.Description).Replace("\n", " ")}  {Describe(visual.Description, visual.DescriptionFormat).Replace("\n", " ")}" +
+                    (lockReason.Length > 0 ? "  |  " + T("解锁需要：{0}", lockReason) : "") + (owned && offer.Product.Weapon != null ? "  |  " + T("点击免费切换至该武器最高已购等级") : "");
                 string name = tier == offer.Level ? "Buy_" + offer.Product.Id : owned && offer.Product.Weapon != null
                     ? $"Equip_{offer.Product.Id}_Tier_{tier}" : $"Buy_{offer.Product.Id}_Tier_{tier}";
                 AddChoice(item, new(columnWidth - .82f, rowHeight - .24f), name, description, () => SelectProductTier(offer, selectedTier, lockReason));
@@ -171,23 +173,23 @@ public partial class UpgradeGallery : Control
             {
                 if (isWeapon)
                 {
-                    return offer.Equipped ? "已装备" : "点击切换";
+                    return offer.Equipped ? T("已装备") : T("点击切换");
                 }
-                return "当前生效";
+                return T("当前生效");
             }
-            return isWeapon ? "已拥有 · 切换" : "已升级替代";
+            return isWeapon ? T("已拥有 · 切换") : T("已升级替代");
         }
         if (tier > offer.Level)
         {
-            return $"先升 Lv.{tier}";
+            return T("先升 Lv.{0}", tier);
         }
         if (offer.Status == PurchaseStatus.Locked)
         {
-            return "前置未满足";
+            return T("前置未满足");
         }
         return offer.Status == PurchaseStatus.InsufficientFunds
-            ? $"¥{offer.Price} · 余额不足"
-            : $"¥{offer.Price} · 点击购买";
+            ? T("¥{0} · 余额不足", offer.Price)
+            : T("¥{0} · 点击购买", offer.Price);
     }
 
     /// <summary>把已购、待升级和未解锁三种选择转换为界面命令或提示，不直接操作钱包。</summary>
@@ -202,16 +204,16 @@ public partial class UpgradeGallery : Control
             else
             {
                 var current = offer.Product.TierAt(offer.Level - 1);
-                Message?.Invoke(current.Name + " 当前生效 · " + current.Description.Replace("\n", " "));
+                Message?.Invoke(T("{0} 当前生效 · {1}", T(current.Name), Describe(current.Description, current.DescriptionFormat).Replace("\n", " ")));
             }
         }
         else if (selectedTier > offer.Level)
         {
-            Message?.Invoke("先购买上一阶，再解锁这一阶。");
+            Message?.Invoke(T("先购买上一阶，再解锁这一阶。"));
         }
         else if (offer.Status == PurchaseStatus.Locked)
         {
-            Message?.Invoke("解锁需要：" + lockReason);
+            Message?.Invoke(T("解锁需要：{0}", lockReason));
         }
         else
         {
@@ -246,7 +248,7 @@ public partial class UpgradeGallery : Control
         }
         for (int i = 0; i < branches.Length; i++)
         {
-            _art.Label(board, branches[i].Name, new(-6 + (i + .5f) * 12 / branches.Length, 6.76f, .15f), 43, .009f);
+            _art.Label(board, T(branches[i].Name), new(-6 + (i + .5f) * 12 / branches.Length, 6.76f, .15f), 43, .009f);
         }
 
         foreach (var offer in offers)
@@ -270,12 +272,12 @@ public partial class UpgradeGallery : Control
             var icon = new Node3D { Position = new(0, .17f, .12f) };
             item.AddChild(icon);
             _art.SkillIcon(icon, skill.Branch.Icon, new("dab982"));
-            string status = learned ? "已学会" : offer.Status == SkillStatus.Locked ? "前置未解锁" : $"¥{skill.Cost}";
-            var caption = _art.Label(item, $"{skill.Name}\n{status}", new(0, -.36f, .25f), 29, .009f);
+            string status = learned ? T("已学会") : offer.Status == SkillStatus.Locked ? T("前置未解锁") : $"¥{skill.Cost}";
+            var caption = _art.Label(item, $"{T(skill.Name)}\n{status}", new(0, -.36f, .25f), 29, .009f);
             caption.Modulate = new(learned ? "a8d8b1" : available ? "ffdea1" : "9d9182");
-            string prerequisite = skill.ParentId == null ? "" : "前置：" + (offers.FirstOrDefault(s => s.Skill.Id == skill.ParentId)?.Skill.Name ?? skill.ParentId);
+            string prerequisite = skill.ParentId == null ? "" : T("前置：{0}", T(offers.FirstOrDefault(s => s.Skill.Id == skill.ParentId)?.Skill.Name ?? skill.ParentId));
             AddChoice(item, new(Mathf.Min(2.35f, 11f / Mathf.Max(1, branches.Length)), 1.50f), "Learn_" + skill.Id,
-                $"{skill.Name}    {skill.Description}    ¥{skill.Cost}  {prerequisite}", () => Learn?.Invoke(skill.Id), learned);
+                $"{T(skill.Name)}    {T(skill.Description)}    ¥{skill.Cost}  {prerequisite}", () => Learn?.Invoke(skill.Id), learned);
         }
         Arrange();
     }

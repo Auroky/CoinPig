@@ -163,7 +163,15 @@ public partial class PigModel : Node3D
         }
         _hurtTime = .18f;
         _healthSeconds = 1.5f;
-        _healthLabel.Text = $"耐久 {damage.RemainingHealth} / {State.Definition.MaxHealth}";
+        RefreshHealthLabel(damage.RemainingHealth);
+    }
+
+    private GameLanguage _healthLanguage;
+
+    private void RefreshHealthLabel(int health)
+    {
+        _healthLanguage = GameText.Language;
+        _healthLabel.Text = GameText.T("耐久 {0} / {1}", health, State.Definition.MaxHealth);
     }
 
     public void Tick(float delta)
@@ -199,6 +207,10 @@ public partial class PigModel : Node3D
 
         _key.Rotation = new(0, 0, _motion.Time * 2.2f + _index);
         _healthLabel.Visible = _healthSeconds > 0 && _motion.Active && State.Health < State.Definition.MaxHealth;
+        if (_healthLabel.Visible && _healthLanguage != GameText.Language)
+        {
+            RefreshHealthLabel(State.Health);
+        }
         _cracks.Visible = _motion.Active && State.Health < State.Definition.MaxHealth;
     }
 

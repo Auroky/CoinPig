@@ -1,0 +1,557 @@
+# English translations for CoinPig. Chinese source strings are used as message IDs.
+msgid ""
+msgstr ""
+"Project-Id-Version: CoinPig\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "购入成功  −¥{0}"
+msgstr "Purchased −¥{0}"
+
+msgid "余额不足"
+msgstr "Low funds"
+
+msgid "已达到最高等级"
+msgstr "Max level reached"
+
+msgid "收工后可以购买"
+msgstr "Shop opens after work"
+
+msgid "价格已更新，请重新选择"
+msgstr "Offer changed. Please select again."
+
+msgid "需要先完成前置装备升级"
+msgstr "Buy the required upgrades first"
+
+msgid "商品不存在"
+msgstr "Unknown item"
+
+msgid "学会了  −¥{0}"
+msgstr "Skill learned −¥{0}"
+
+msgid "已经学会"
+msgstr "Already learned"
+
+msgid "需要先学习前置技能"
+msgstr "Learn the required skill first"
+
+msgid "收工后可以学习"
+msgstr "Skills are available after work"
+
+msgid "技能不存在"
+msgstr "Unknown skill"
+
+msgid "、"
+msgstr ", "
+
+msgid "已付"
+msgstr "Paid"
+
+msgid "未付"
+msgstr "Unpaid"
+
+msgid "今日到期"
+msgstr "Due today"
+
+msgid "{0} 天后"
+msgstr "In {0} days"
+
+msgid "返回"
+msgstr "Back"
+
+msgid "还 款 日"
+msgstr "PAYDAY"
+
+msgid "开始游戏"
+msgstr "Start Game"
+
+msgid "玩法"
+msgstr "How to Play"
+
+msgid "设置"
+msgstr "Settings"
+
+msgid "语言"
+msgstr "Language"
+
+msgid "全屏 / 窗口   [F11]"
+msgstr "Fullscreen / Windowed   [F11]"
+
+msgid "退出游戏"
+msgstr "Quit Game"
+
+msgid "租约终止"
+msgstr "Lease Terminated"
+
+msgid "本期租约完成"
+msgstr "Lease Complete"
+
+msgid "第 {0} 天 · 结算"
+msgstr "Day {0} Summary"
+
+msgid "本期租金还差 ¥{0}"
+msgstr "Rent shortfall: ¥{0}"
+
+msgid "{0} 局租约完成 · 无尽模式不再收租"
+msgstr "{0}-day lease complete · No rent in Endless Mode"
+
+msgid "今日营业结束"
+msgstr "Work is done for today"
+
+msgid "击碎"
+msgstr "Pigs broken"
+
+msgid "{0} 只"
+msgstr "{0}"
+
+msgid "收入"
+msgstr "Income"
+
+msgid "租金"
+msgstr "Rent"
+
+msgid "余额"
+msgstr "Balance"
+
+msgid "下次租金：第 {0} 天 ¥{1} · 还需准备 ¥{2}"
+msgstr "Next rent: Day {0} · ¥{1} · Still needed: ¥{2}"
+
+msgid "装备"
+msgstr "Gear"
+
+msgid "技能"
+msgstr "Skills"
+
+msgid "进入无尽模式"
+msgstr "Enter Endless Mode"
+
+msgid "开始下一天"
+msgstr "Start Next Day"
+
+msgid "重新开始"
+msgstr "Restart"
+
+msgid "余额 ¥{0}"
+msgstr "Balance ¥{0}"
+
+msgid "前置：{0}"
+msgstr "Requires: {0}"
+
+msgid "已学会"
+msgstr "Learned"
+
+msgid "未解锁"
+msgstr "Locked"
+
+msgid "学习 ¥{0}"
+msgstr "Learn ¥{0}"
+
+msgid "返回结算"
+msgstr "Back to Summary"
+
+msgid "商店"
+msgstr "Shop"
+
+msgid "技能树"
+msgstr "Skills"
+
+msgid "金币 ¥{0}"
+msgstr "Coins ¥{0}"
+
+msgid "查看租金"
+msgstr "View Rent"
+
+msgid "进入第 {0} 局"
+msgstr "Start Day {0}"
+
+msgid "沿金线解锁技能，使用金币购买。"
+msgstr "Follow the gold lines to unlock skills and spend coins to learn them."
+
+msgid "I 锤具与护腕 → II 电锯 → III 砂轮 · 已购武器可免费切换。"
+msgstr "I Hammers & Cuffs → II Chainsaws → III Grinders · Switch owned weapons for free."
+
+msgid "选择一项能力"
+msgstr "Choose a Perk"
+
+msgid "租金已付 ¥{0} · 当前金币 ¥{1}"
+msgstr "Rent paid ¥{0} · Coins ¥{1}"
+
+msgid "租约"
+msgstr "Lease"
+
+msgid "下次：第 {0} 天 ¥{1} · 当前缺口 ¥{2}"
+msgstr "Next: Day {0} · ¥{1} · Shortfall: ¥{2}"
+
+msgid "续租 第 {0} 天  ·  ¥{1}"
+msgstr "Renewal · Day {0} · ¥{1}"
+
+msgid "第 {0} 天  ·  ¥{1}"
+msgstr "Day {0} · ¥{1}"
+
+msgid "第 10 局结清房租后进入无尽模式，不再收租。"
+msgstr "Pay the final bill on Day 10 to unlock Endless Mode. No more rent."
+
+msgid "返回营业"
+msgstr "Back to Work"
+
+msgid "返回工坊"
+msgstr "Back to Workshop"
+
+msgid "暂停"
+msgstr "Paused"
+
+msgid "继续游戏"
+msgstr "Resume Game"
+
+msgid "重新开始？"
+msgstr "Restart Game?"
+
+msgid "本局的金币和升级将清空。"
+msgstr "This run's coins and upgrades will be lost."
+
+msgid "取消"
+msgstr "Cancel"
+
+msgid "提前收工？"
+msgstr "End the Day Early?"
+
+msgid "还剩 {0} 点体力。收工后结算收入，并支付到期租金。"
+msgstr "You have {0} stamina left. Ending the day counts your earnings and pays any rent due."
+
+msgid "收工"
+msgstr "End Day"
+
+msgid "继续营业"
+msgstr "Keep Working"
+
+msgid "{0}：{1} 点耐久，速度 ×{2:0.##}，击碎 ¥{3}。"
+msgstr "{0}: {1} HP · Speed ×{2:0.##} · Reward ¥{3}"
+
+msgid "移动鼠标瞄准，工具会自动连续攻击，无需点击。\n开局有准备时间，瞄准猪后才开始；快速换目标会短暂缓攻。\n空击也消耗体力；将鼠标移出桌面可停止新的攻击。\n\n{0}\n工具升级会提高伤害、范围和体力，技能可叠加。\n当前商店的工具每次攻击均耗能 1。\n护腕共振每局有次数上限，升级后强化效果。\n\n主线共 10 局，每 2 局交租，第 10 局支付最后一笔；按 B 查看账单。\n余额不足则破产，收工后可买装备、学技能。\n中途交租成功后可选能力；第 6 局起加入装甲猪。\n结清房租后进入无尽模式，保留金币和升级，不再收租。"
+msgstr "Move the mouse to aim. Your tool attacks automatically.\nAim at a pig after the opening delay. Switching targets briefly pauses attacks.\nMisses cost stamina. Move off the table to stop new attacks.\n\n{0}\nTool upgrades improve damage, range, and stamina. Skill bonuses stack.\nEach shop tool costs 1 stamina per attack.\nCuff pulses are limited per day and get stronger with upgrades.\n\nPay rent every 2 days through Day 10. Press B to view your bills.\nRun out of rent money and the lease ends. Shop and learn skills after work.\nChoose a perk after paying an interim bill. Armored pigs arrive on Day 6.\nPay the last bill to enter Endless Mode with your coins and upgrades."
+
+msgid "提前收工  [E]"
+msgstr "End Day  [E]"
+
+msgid "暂停  [Esc]"
+msgstr "Pause  [Esc]"
+
+msgid "无尽 · 第 {0} 局"
+msgstr "Endless · Day {0}"
+
+msgid "第 {0}/{1} 局"
+msgstr "Day {0}/{1}"
+
+msgid "{0}   体力 {1} / {2}"
+msgstr "{0}   Stamina {1} / {2}"
+
+msgid "余额  ¥{0}"
+msgstr "Balance  ¥{0}"
+
+msgid "击碎 {0} 只   /   最佳 {1} 只"
+msgstr "Broken {0}   /   Best {1}"
+
+msgid "今天"
+msgstr "Today"
+
+msgid "明天"
+msgstr "Tomorrow"
+
+msgid "租金 ¥{0} · {1}  [B]"
+msgstr "Rent ¥{0} · {1}  [B]"
+
+msgid "租金已缴清 · 查看  [B]"
+msgstr "Rent Paid  [B]"
+
+msgid "{0} Lv.{1} · 伤害 {2} · 耗能 {3} · 自动攻击"
+msgstr "{0} Lv.{1} · DMG {2} · Cost {3} · Auto Attack"
+
+msgid "双响！"
+msgstr "Double!"
+
+msgid "连碎！"
+msgstr "Combo!"
+
+msgid "砸空了"
+msgstr "Miss"
+
+msgid "击碎 1 只  +¥{0}"
+msgstr "Broken 1  +¥{0}"
+
+msgid "命中 {0} 只 · 击碎 0 只"
+msgstr "Hits {0} · Broken 0"
+
+msgid "CoinPig · 还款日"
+msgstr "CoinPig · Payday"
+
+msgid "已装备 {0} · 无需额外金币"
+msgstr "Equipped {0} · Free switch"
+
+msgid "尚未拥有这件武器"
+msgstr "You don't own this weapon yet"
+
+msgid "{0}出现 · 耐久 {1}"
+msgstr "{0} arrives · {1} HP"
+
+msgid "开局准备 · 瞄准一只猪后自动挥锤，无需点击"
+msgstr "Get ready · Aim at a pig to swing"
+
+msgid "等待本次攻击完成"
+msgstr "Wait for the current attack to finish"
+
+msgid "开局准备 {0:0.0}s · 移动鼠标瞄准"
+msgstr "Ready in {0:0.0}s · Move the mouse to aim"
+
+msgid "瞄准一只猪，工具会自动攻击 · 无需点击"
+msgstr "Aim at a pig · Your tool attacks automatically"
+
+msgid "耐久 {0} / {1}"
+msgstr "HP {0} / {1}"
+
+msgid "解锁需要：{0}"
+msgstr "Unlocks after: {0}"
+
+msgid "点击免费切换至该武器最高已购等级"
+msgstr "Switch to the highest owned tier for free"
+
+msgid "已装备"
+msgstr "Equipped"
+
+msgid "点击切换"
+msgstr "Equip"
+
+msgid "当前生效"
+msgstr "Active"
+
+msgid "已拥有 · 切换"
+msgstr "Owned · Equip"
+
+msgid "已升级替代"
+msgstr "Replaced"
+
+msgid "先升 Lv.{0}"
+msgstr "Needs Lv.{0}"
+
+msgid "前置未满足"
+msgstr "Locked"
+
+msgid "¥{0} · 余额不足"
+msgstr "¥{0} · Low funds"
+
+msgid "¥{0} · 点击购买"
+msgstr "¥{0} · Buy"
+
+msgid "{0} 当前生效 · {1}"
+msgstr "{0} active · {1}"
+
+msgid "先购买上一阶，再解锁这一阶。"
+msgstr "Buy the previous tier to unlock this one."
+
+msgid "前置未解锁"
+msgstr "Locked"
+
+msgid "等级 {0}"
+msgstr "Tier {0}"
+
+msgid "敲击锤"
+msgstr "Hammer"
+
+msgid "工具"
+msgstr "Tool"
+
+msgid "共振波"
+msgstr "Resonance"
+
+msgid "普通陶瓷猪"
+msgstr "Ceramic Pig"
+
+msgid "铁皮储金猪"
+msgstr "Tin Pig"
+
+msgid "金鼻快跑猪"
+msgstr "Swift Pig"
+
+msgid "装甲储金猪"
+msgstr "Armored Pig"
+
+msgid "电锯"
+msgstr "Chainsaw"
+
+msgid "砂轮"
+msgstr "Grinder"
+
+msgid "铜芯锤"
+msgstr "Copper Hammer"
+
+msgid "钴钢锤"
+msgstr "Cobalt Hammer"
+
+msgid "星辉锤"
+msgstr "Star Hammer"
+
+msgid "铜芯电锯"
+msgstr "Copper Chainsaw"
+
+msgid "钴钢电锯"
+msgstr "Cobalt Chainsaw"
+
+msgid "星辉电锯"
+msgstr "Star Chainsaw"
+
+msgid "铜芯砂轮"
+msgstr "Copper Grinder"
+
+msgid "钴钢砂轮"
+msgstr "Cobalt Grinder"
+
+msgid "星辉砂轮"
+msgstr "Star Grinder"
+
+msgid "伤害 {0} · 半径 {1:0.00} · 体力 +{2} · 每击耗能 {3}（不含护腕与技能）"
+msgstr "Damage {0} · Radius {1:0.00} · Stamina +{2} · Cost {3} per hit (before cuffs and skills)"
+
+msgid "鎏金振纹护腕"
+msgstr "Gilded Cuff"
+
+msgid "共振护腕"
+msgstr "Resonance Cuff"
+
+msgid "金鸣护腕"
+msgstr "Chime Cuff"
+
+msgid "命中释放金波：范围 1 伤害，每局 5 次\n全武器体力 +1"
+msgstr "Hits release a golden wave for 1 area damage, up to 5 times per day.\nAll weapons gain 1 stamina."
+
+msgid "金波 + 每 3 秒自动震裂 1 只、掉币\n每局 8 次自动共振，体力累计 +2"
+msgstr "Golden waves plus an auto pulse every 3 seconds that cracks one pig and can earn coins.\nUp to 8 auto pulses per day. Total stamina bonus: +2."
+
+msgid "大范围金鸣：2 伤害，每局 6 次\n自动群体慢裂 8 次，体力累计 +3"
+msgstr "Wide golden waves for 2 damage, up to 6 times per day.\n8 auto pulses affect groups. Total stamina bonus: +3."
+
+msgid "加宽锤面"
+msgstr "Wide Hammer"
+
+msgid "升级扩大范围、提高伤害与体力"
+msgstr "Upgrades increase range, damage, and stamina"
+
+msgid "金色震荡 / 自动慢裂 / 群体金鸣\n每级体力 +1，与所有武器共存"
+msgstr "Golden waves, auto cracks, and group pulses.\n+1 stamina per tier. Works with any weapon."
+
+msgid "广域快切 · 升级扩大范围、提高体力"
+msgstr "Fast, wide cuts · Upgrades increase range and stamina"
+
+msgid "重型研磨 · 升级扩大范围、提高体力"
+msgstr "Heavy grinding · Upgrades increase range and stamina"
+
+msgid "双响赏金"
+msgstr "Double Hit Bonus"
+
+msgid "一锤击碎至少两只，额外赚 ¥{0}。"
+msgstr "Break at least two pigs in one swing for ¥{0} extra."
+
+msgid "借力回弹"
+msgstr "Second Wind"
+
+msgid "每局前 {0} 次一锤多碎，各返还 1 点体力。"
+msgstr "Each day, regain 1 stamina the first {0} times you break multiple pigs in one swing."
+
+msgid "黄铜内胆"
+msgstr "Brass Lining"
+
+msgid "每局前 {0} 只击碎的猪各额外掉落 ¥1。"
+msgstr "Earn ¥1 extra for each of the first {0} pigs you break per day."
+
+msgid "工间加餐"
+msgstr "Lunch Break"
+
+msgid "从下一局开始，每局多 {0} 点体力。"
+msgstr "Gain {0} stamina per day, starting the next day."
+
+msgid "单响奖"
+msgstr "Single Hit Bonus"
+
+msgid "一锤恰好击碎一只，额外赚 ¥{0}。"
+msgstr "Break exactly one pig in a swing for ¥{0} extra."
+
+msgid "宽边锤套"
+msgstr "Wider Swing"
+
+msgid "落锤半径增加 {0:0.00}，圈边更容易够到猪。"
+msgstr "Increase your attack radius by {0:0.00} to reach farther."
+
+msgid "锤法"
+msgstr "Technique"
+
+msgid "重击"
+msgstr "Power"
+
+msgid "耐力"
+msgstr "Stamina"
+
+msgid "收益"
+msgstr "Earnings"
+
+msgid "宽面练习"
+msgstr "Wide Swing"
+
+msgid "落锤半径 +0.10"
+msgstr "Attack radius +0.10"
+
+msgid "轻巧手法"
+msgstr "Quick Hands"
+
+msgid "落锤后的恢复时间缩短 0.04 秒"
+msgstr "Recover 0.04 seconds faster after a swing"
+
+msgid "借势回弹"
+msgstr "Rebound"
+
+msgid "每局首次一锤多碎返还 1 点体力，可与随机能力叠加"
+msgstr "Each day, regain 1 stamina the first time you break multiple pigs in one swing. Stacks with perks."
+
+msgid "重击练习 I"
+msgstr "Power Training I"
+
+msgid "伤害 +1，减少击碎高耐久猪所需的攻击次数"
+msgstr "Damage +1. Break high-HP pigs in fewer hits."
+
+msgid "重击练习 II"
+msgstr "Power Training II"
+
+msgid "伤害再 +1，可与当前武器的伤害叠加"
+msgstr "Damage +1 again. Stacks with your weapon's damage."
+
+msgid "耐力练习"
+msgstr "Stamina Drill"
+
+msgid "每局体力上限 +1"
+msgstr "Daily stamina cap +1"
+
+msgid "呼吸节奏"
+msgstr "Steady Breathing"
+
+msgid "每局体力上限再 +1"
+msgstr "Daily stamina cap +1 again"
+
+msgid "充沛精力"
+msgstr "High Energy"
+
+msgid "双响红利"
+msgstr "Double Bonus"
+
+msgid "每次一锤至少击碎两只，额外赚 ¥1"
+msgstr "Earn ¥1 extra when a swing breaks at least two pigs"
+
+msgid "收集习惯"
+msgstr "Coin Collector"
+
+msgid "每只击碎的猪额外掉落 ¥1"
+msgstr "Earn ¥1 extra for every pig you break"
+
+msgid "满堂彩"
+msgstr "Triple Bonus"
+
+msgid "每次一锤至少击碎三只，额外赚 ¥4"
+msgstr "Earn ¥4 extra when a swing breaks at least three pigs"
